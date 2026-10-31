@@ -11,7 +11,9 @@ model Workspace {
   id          String       @id @default(uuid())
   name        String
   slug        String       @unique
-  plan        String       @default("pro")
+  plan        String       @default("free")
+  paidUntil   DateTime?
+  suspended   Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -19,6 +21,8 @@ model Workspace {
   systems     System[]
   qrCodes     QRCode[]
   webhooks    Webhook[]
+  payments    Payment[]
+  audits      AuditLog[]
 
   @@map("workspaces")
 }
@@ -29,11 +33,13 @@ model User {
   name         String
   email        String     @unique
   passwordHash String
-  role         String     @default("admin") // owner, admin, editor, viewer
+  role         String     @default("owner") // workspace role, not platform administrator
+  platformAdmin Boolean   @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sessions     Session[]
 
   @@index([workspaceId])
   @@map("users")
@@ -71,6 +77,7 @@ model CustomField {
   system     System    @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
   @@index([systemId])
+  @@unique([systemId, key])
   @@map("custom_fields")
 }
 
@@ -146,4 +153,47 @@ model Webhook {
 
   @@index([workspaceId])
   @@map("webhooks")
+}
+
+model Session {
+  tokenHash String @id
+  userId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RateLimit {
+  key String @id
+  count Int @default(1)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model Payment {
+  id String @id @default(uuid())
+  workspaceId String
+  orderId String @unique
+  paymentId String? @unique
+  plan String
+  amount Int
+  currency String @default("INR")
+  status String @default("created")
+  createdAt DateTime @default(now())
+  paidAt DateTime?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  workspaceId String
+  actorId String
+  action String
+  entityId String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
 }
