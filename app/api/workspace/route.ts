@@ -12,6 +12,7 @@ import {
 } from "@/lib/http";
 import {
   name,
+  email,
   destination,
   qrSchema,
   systemSchema,
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       webhooks,
       apiKeys,
       webhookDeliveries,
+      invitations,
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
@@ -115,6 +117,7 @@ export async function GET(request: NextRequest) {
       prisma.webhook.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, url: true, events: true, isActive: true, createdAt: true } }),
       prisma.apiKey.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, label: true, prefix: true, lastUsedAt: true, revokedAt: true, createdAt: true } }),
       prisma.webhookDelivery.findMany({ where: { webhook: { workspaceId } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, eventType: true, status: true, responseCode: true, attempts: true, lastError: true, createdAt: true, deliveredAt: true, webhook: { select: { url: true } } } }),
+      prisma.invitation.findMany({ where: { workspaceId, acceptedAt: null }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, email: true, role: true, expiresAt: true, createdAt: true } }),
     ]);
     const plan = effectivePlan(user.workspace);
     const prices = {
@@ -151,6 +154,7 @@ export async function GET(request: NextRequest) {
       webhooks,
       apiKeys,
       webhookDeliveries,
+      invitations,
       limits: limits[plan],
       prices,
       checkoutReady: !!(
@@ -396,6 +400,29 @@ export async function POST(request: NextRequest) {
         if (!input.id) throw new ApiError(400, "API key is required.");
         entity = await tx.apiKey.updateMany({ where: { id: input.id, workspaceId, revokedAt: null }, data: { revokedAt: new Date() } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "API key not found.");
+      } else if (input.action === "team.invite") {
+        if (user.role !== "owner") throw new ApiError(403, "Only the workspace owner can invite members.");
+        const data = z.object({ email, role: z.enum(["admin", "editor", "viewer"]).default("editor") }).parse(input.data);
+        if (await tx.user.findUnique({ where: { email: data.email } })) throw new ApiError(409, "That email already has an account.");
+        const token = `invite_${randomBytes(32).toString("base64url")}`;
+        oneTimeSecret = token;
+        entity = await tx.invitation.create({ data: { ...data, workspaceId, tokenHash: createHash("sha256").update(token).digest("hex"), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } });
+      } else if (input.action === "team.role") {
+        if (user.role !== "owner") throw new ApiError(403, "Only the workspace owner can change roles.");
+        if (!input.id || input.id === user.id) throw new ApiError(400, "Choose another workspace member.");
+        const data = z.object({ role: z.enum(["admin", "editor", "viewer"]) }).parse(input.data);
+        entity = await tx.user.updateMany({ where: { id: input.id, workspaceId }, data }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Member not found.");
+      } else if (input.action === "team.remove") {
+        if (user.role !== "owner") throw new ApiError(403, "Only the workspace owner can remove members.");
+        if (!input.id || input.id === user.id) throw new ApiError(400, "You cannot remove yourself.");
+        entity = await tx.user.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Member not found.");
+      } else if (input.action === "invitation.revoke") {
+        if (user.role !== "owner") throw new ApiError(403, "Only the workspace owner can revoke invitations.");
+        if (!input.id) throw new ApiError(400, "Invitation is required.");
+        entity = await tx.invitation.deleteMany({ where: { id: input.id, workspaceId, acceptedAt: null } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Invitation not found.");
       } else if (input.action === "workspace.rename") {
         if (user.role !== "owner")
           throw new ApiError(

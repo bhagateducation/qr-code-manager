@@ -26,6 +26,7 @@ model Workspace {
   campaigns   Campaign[]
   integrations Integration[]
   apiKeys     ApiKey[]
+  invitations Invitation[]
   payments    Payment[]
   audits      AuditLog[]
 
@@ -261,6 +262,21 @@ model ApiKey {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([workspaceId, revokedAt])
   @@map("api_keys")
+}
+
+model Invitation {
+  id          String    @id @default(uuid())
+  workspaceId String
+  email       String
+  role        String    @default("editor")
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, email])
+  @@index([expiresAt])
+  @@map("invitations")
 }
 
 model Session {

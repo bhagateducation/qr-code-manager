@@ -36,6 +36,7 @@ import QRStudio from "./QRStudio";
 import Systems from "./Systems";
 import PasswordSettings from "./PasswordSettings";
 import FeaturePanel from "./FeaturePanel";
+import TeamPanel from "./TeamPanel";
 
 export type QR = {
   id: string;
@@ -107,6 +108,7 @@ type Data = {
   webhooks: { id: string; url: string; events: unknown; isActive: boolean; createdAt: string }[];
   apiKeys: { id: string; label: string; prefix: string; lastUsedAt: string | null; revokedAt: string | null; createdAt: string }[];
   webhookDeliveries: { id: string; eventType: string; status: string; responseCode: number | null; attempts: number; lastError: string | null; createdAt: string; deliveredAt: string | null; webhook: { url: string } }[];
+  invitations: { id: string; email: string; role: string; expiresAt: string; createdAt: string }[];
 };
 export async function api(path: string, data?: unknown) {
   const response = await fetch(path, {
@@ -740,23 +742,7 @@ export default function Dashboard() {
               </div>
             )}
             {tab === "team" && (
-              <div className="panel">
-                <h2>Workspace members</h2>
-                <p className="muted">
-                  Only people in this workspace are listed. Team invitations are
-                  planned for the next release.
-                </p>
-                {data.members.map((m) => (
-                  <div className="member" key={m.id}>
-                    <span className="user-avatar">{m.name[0]}</span>
-                    <div>
-                      <strong>{m.name}</strong>
-                      <small>{m.email}</small>
-                    </div>
-                    <span className="badge">{m.role}</span>
-                  </div>
-                ))}
-              </div>
+              <TeamPanel data={data} canWrite={canWrite} mutate={mutate} />
             )}
             {tab === "billing" && (
               <Billing data={data} reload={load} onError={setError} />
