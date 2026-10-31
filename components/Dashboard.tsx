@@ -23,6 +23,14 @@ import {
   ExternalLink,
   Users,
   Activity,
+  List,
+  Tag,
+  Zap,
+  GitBranch,
+  Megaphone,
+  Puzzle,
+  Code2,
+  HelpCircle,
 } from "lucide-react";
 import QRStudio from "./QRStudio";
 import Systems from "./Systems";
@@ -120,15 +128,61 @@ function csvCell(value: unknown) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 const navigation = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "codes", label: "QR codes", icon: QrCode },
-  { id: "systems", label: "Systems & records", icon: Layers },
-  { id: "analytics", label: "Scan activity", icon: BarChart3 },
-  { id: "team", label: "Team", icon: Users },
-  { id: "billing", label: "Plans & billing", icon: CreditCard },
-  { id: "activity", label: "Audit log", icon: Activity },
-  { id: "settings", label: "Settings", icon: Settings },
+  { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Main" },
+  { id: "systems", label: "Systems", icon: Layers, group: "Main" },
+  { id: "records", label: "Records", icon: List, group: "Main" },
+  { id: "codes", label: "QR codes", icon: QrCode, group: "Main" },
+  { id: "tags", label: "Tags", icon: Tag, group: "Main", planned: true },
+  { id: "functions", label: "Functions", icon: Zap, group: "Main", planned: true },
+  { id: "workflows", label: "Workflows", icon: GitBranch, group: "Main", planned: true },
+  { id: "campaigns", label: "Campaigns", icon: Megaphone, group: "Main", planned: true },
+  { id: "analytics", label: "Analytics", icon: BarChart3, group: "Main" },
+  { id: "integrations", label: "Integrations", icon: Puzzle, group: "Connect", planned: true },
+  { id: "webhooks", label: "API & Webhooks", icon: Code2, group: "Connect", planned: true },
+  { id: "team", label: "Team & roles", icon: Users, group: "Manage" },
+  { id: "billing", label: "Billing", icon: CreditCard, group: "Manage" },
+  { id: "activity", label: "Audit log", icon: Activity, group: "Manage" },
+  { id: "settings", label: "Settings", icon: Settings, group: "Manage" },
+  { id: "help", label: "Help & support", icon: HelpCircle, group: "Manage", planned: true },
 ];
+
+const plannedFeatures: Record<string, { title: string; description: string; scope: string }> = {
+  tags: {
+    title: "Tags & collections",
+    description: "Organise QR codes with reusable tags and campaign folders.",
+    scope: "Tag creation, filtering, bulk assignment and workspace-level permissions.",
+  },
+  functions: {
+    title: "Business functions",
+    description: "Turn a scan into a validated business action.",
+    scope: "Check-ins, inventory updates, voucher redemption and authenticated actions.",
+  },
+  workflows: {
+    title: "Workflows",
+    description: "Connect QR scans to repeatable multi-step processes.",
+    scope: "Triggers, conditions, approvals, retries and execution history.",
+  },
+  campaigns: {
+    title: "Campaigns",
+    description: "Group QR codes and measure campaign performance in one place.",
+    scope: "Campaign attribution, UTM tracking, scheduling and exports.",
+  },
+  integrations: {
+    title: "Integrations",
+    description: "Connect QR Manager with the tools your team already uses.",
+    scope: "Provider connections, encrypted credentials and per-workspace permissions.",
+  },
+  webhooks: {
+    title: "API & Webhooks",
+    description: "Build secure integrations on top of your QR workspace.",
+    scope: "Scoped API keys, signed webhooks, delivery retries and request logs.",
+  },
+  help: {
+    title: "Help & support",
+    description: "Guides and support channels for your QR Manager workspace.",
+    scope: "Product documentation, onboarding checklist and support requests.",
+  },
+};
 
 export default function Dashboard() {
   const [data, setData] = useState<Data | null>(null),
@@ -376,19 +430,24 @@ export default function Dashboard() {
           </div>
         </div>
         <nav aria-label="Workspace navigation">
-          {navigation.map((item) => (
-            <button
-              key={item.id}
-              aria-current={tab === item.id ? "page" : undefined}
-              className={tab === item.id ? "selected" : ""}
-              onClick={() => select(item.id)}
-            >
-              <item.icon size={19} />
-              {item.label}
-              {item.id === "codes" && (
-                <span className="nav-count">{data.active}</span>
+          {navigation.map((item, index) => (
+            <div key={item.id}>
+              {(index === 0 || navigation[index - 1].group !== item.group) && (
+                <div className="nav-section-label">{item.group}</div>
               )}
-            </button>
+              <button
+                aria-current={tab === item.id ? "page" : undefined}
+                className={`${tab === item.id ? "selected" : ""}${item.planned ? " planned" : ""}`}
+                onClick={() => select(item.id)}
+              >
+                <item.icon size={18} />
+                <span>{item.label}</span>
+                {item.id === "codes" && (
+                  <span className="nav-count">{data.active}</span>
+                )}
+                {item.planned && <span className="nav-planned">Soon</span>}
+              </button>
+            </div>
           ))}
           {data.user.platformAdmin && (
             <button
@@ -592,6 +651,13 @@ export default function Dashboard() {
                 mutate={mutate}
               />
             )}
+            {tab === "records" && (
+              <Systems
+                systems={data.systems}
+                canWrite={canWrite}
+                mutate={mutate}
+              />
+            )}
             {tab === "analytics" && (
               <div className="panel">
                 <div className="panel-heading">
@@ -743,12 +809,34 @@ export default function Dashboard() {
               </div>
             )}
             {tab === "platform" && data.user.platformAdmin && <Platform />}
+            {plannedFeatures[tab] && <PlannedFeature feature={plannedFeatures[tab]} />}
           </div>
           <footer className="panel-footer">
             QR Manager <span>One workspace. Every connection.</span>
           </footer>
         </main>
       </div>
+    </div>
+  );
+}
+
+function PlannedFeature({
+  feature,
+}: {
+  feature: { title: string; description: string; scope: string };
+}) {
+  return (
+    <div className="panel feature-roadmap">
+      <span className="badge">Coming in the next release</span>
+      <h2>{feature.title}</h2>
+      <p className="muted">{feature.description}</p>
+      <div className="roadmap-scope">
+        <strong>Planned scope</strong>
+        <p>{feature.scope}</p>
+      </div>
+      <p className="muted">
+        This section is visible now so the full QR Manager structure stays intact. It will be enabled only after its server-side permissions, persistence and audit trail are complete.
+      </p>
     </div>
   );
 }

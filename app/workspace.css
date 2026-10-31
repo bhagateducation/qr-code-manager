@@ -318,6 +318,17 @@ label small {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.nav-section-label {
+  padding: 10px 12px 4px;
+  color: #9a94a4;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .sidebar nav button {
   display: flex;
@@ -329,6 +340,20 @@ label small {
   color: #6b6574;
   font-size: 12px;
   min-height: 44px;
+}
+.sidebar nav button.planned {
+  color: #8f899a;
+}
+.sidebar nav button.planned:hover {
+  color: var(--brand);
+}
+.nav-planned {
+  margin-left: auto;
+  color: #9b94a9;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .sidebar nav button:hover {
   background: #f5f3f9;
@@ -686,6 +711,28 @@ tbody tr:last-child td {
   margin: 0;
 }
 .empty p {
+  font-size: 12px;
+}
+.feature-roadmap {
+  max-width: 760px;
+}
+.feature-roadmap h2 {
+  margin-top: 16px;
+}
+.roadmap-scope {
+  margin: 24px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf9fd;
+}
+.roadmap-scope strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+.roadmap-scope p {
+  margin: 7px 0 0;
+  color: var(--muted);
   font-size: 12px;
 }
 .panel-footer {
