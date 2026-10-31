@@ -6,11 +6,13 @@ import jsQR from "jsqr";
 import { PNG } from "pngjs";
 import {
   destination,
+  qrSchema,
   systemSchema,
   validateRecord,
   effectivePlan,
 } from "../lib/validation";
 import { validSignature } from "../lib/payment-signature";
+import { buildVCardPayload, buildWifiPayload } from "../lib/qr-payload";
 
 test("redirect validation rejects script, credentials, private destinations and encoded loopbacks", () => {
   for (const value of [
@@ -48,6 +50,14 @@ test("schemas reject duplicate fields and records enforce field types", () => {
     validateRecord(fields, { stock: 1, unauthorized: "value" }),
   );
   assert.deepEqual(validateRecord(fields, { stock: 0 }), { stock: 0 });
+});
+test("native Wi-Fi and vCard payloads validate without weakening dynamic URL checks", () => {
+  const wifi = buildWifiPayload({ ssid: "Guest;Network", password: "p:a\\ss", security: "WPA", hidden: false });
+  const vcard = buildVCardPayload({ name: "Asha; Rao", organization: "QR Manager", phone: "+91 99999 00000", email: "asha@example.com", url: "https://example.com" });
+  assert.equal(qrSchema.safeParse({ title: "Guest Wi-Fi", type: "wifi", targetUrl: wifi }).success, true);
+  assert.equal(qrSchema.safeParse({ title: "Contact", type: "vcard", targetUrl: vcard }).success, true);
+  assert.equal(qrSchema.safeParse({ title: "Broken", type: "wifi", targetUrl: "https://example.com" }).success, false);
+  assert.equal(qrSchema.safeParse({ title: "Broken", type: "dynamic_url", targetUrl: "WIFI:T:nopass;S:test;P:;H:false;;" }).success, false);
 });
 test("expired plans never retain paid entitlements", () => {
   assert.equal(effectivePlan({ plan: "pro", paidUntil: new Date(0) }), "free");

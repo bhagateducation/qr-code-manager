@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       where: { workspaceId: key.workspaceId },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: { id: true, title: true, shortCode: true, targetUrl: true, isActive: true, scanCount: true, campaign: { select: { id: true, name: true } }, tags: { include: { tag: { select: { id: true, name: true, color: true } } } }, createdAt: true, updatedAt: true },
+      select: { id: true, title: true, type: true, shortCode: true, targetUrl: true, isActive: true, scanCount: true, campaign: { select: { id: true, name: true } }, tags: { include: { tag: { select: { id: true, name: true, color: true } } } }, createdAt: true, updatedAt: true },
     });
     return json({ data: qrs });
   } catch (error) {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     const input = qrSchema.parse(JSON.parse(await boundedText(request)));
     const { tagIds, campaignId, ...qrData } = input;
     const app = new URL(process.env.APP_URL!);
-    if ([qrData.targetUrl, qrData.routingRules.ios, qrData.routingRules.android].some((url) => url && new URL(url).origin === app.origin && new URL(url).pathname.startsWith("/s/")))
+    if (qrData.type === "dynamic_url" && [qrData.targetUrl, qrData.routingRules.ios, qrData.routingRules.android].some((url) => url && new URL(url).origin === app.origin && new URL(url).pathname.startsWith("/s/")))
       throw new ApiError(400, "A QR cannot redirect to another QR resolver on this site.");
     const workspace = await prisma.workspace.findUnique({ where: { id: key.workspaceId } });
     if (!workspace || workspace.suspended) throw new ApiError(403, "This workspace is suspended.");

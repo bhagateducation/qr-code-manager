@@ -197,6 +197,7 @@ export async function POST(request: NextRequest) {
         const { tagIds, campaignId, ...qrData } = data;
         const app = new URL(process.env.APP_URL!);
         if (
+          data.type === "dynamic_url" &&
           [
             data.targetUrl,
             data.routingRules.ios,

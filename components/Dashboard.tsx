@@ -44,7 +44,7 @@ export type QR = {
   title: string;
   shortCode: string;
   targetUrl: string;
-  type?: string;
+  type?: "dynamic_url" | "wifi" | "vcard" | "text";
   isActive: boolean;
   scanCount: number;
   styling: { dark: string; light: string; errorCorrectionLevel: string };
@@ -359,15 +359,19 @@ export default function Dashboard() {
                   </button>
                 </td>
                 <td>
-                  <a
-                    className="destination"
-                    href={qr.targetUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {qr.targetUrl}
-                    <ArrowUpRight size={14} />
-                  </a>
+                  {(!qr.type || qr.type === "dynamic_url") ? (
+                    <a
+                      className="destination"
+                      href={qr.targetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {qr.targetUrl}
+                      <ArrowUpRight size={14} />
+                    </a>
+                  ) : (
+                    <code className="destination-payload">{qr.type} payload</code>
+                  )}
                 </td>
                 <td>
                   <span className={`status ${qr.isActive ? "active" : ""}`}>

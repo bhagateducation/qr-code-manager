@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { ArrowLeft, Download, Copy, CheckCircle2, QrCode } from "lucide-react";
 import { QR, saveFile } from "./Dashboard";
+import { buildVCardPayload, buildWifiPayload, QRType } from "@/lib/qr-payload";
 type Styling = {
   dark: string;
   light: string;
@@ -27,7 +28,17 @@ export default function QRStudio({
 }) {
   const [saved, setSaved] = useState(qr),
     [title, setTitle] = useState(qr?.title || ""),
+    [qrType, setQrType] = useState<QRType>(qr?.type || "dynamic_url"),
     [target, setTarget] = useState(qr?.targetUrl || ""),
+    [ssid, setSsid] = useState(""),
+    [wifiPassword, setWifiPassword] = useState(""),
+    [wifiSecurity, setWifiSecurity] = useState<"WPA" | "WEP" | "nopass">("WPA"),
+    [wifiHidden, setWifiHidden] = useState(false),
+    [vcardName, setVcardName] = useState(""),
+    [vcardOrganization, setVcardOrganization] = useState(""),
+    [vcardPhone, setVcardPhone] = useState(""),
+    [vcardEmail, setVcardEmail] = useState(""),
+    [vcardUrl, setVcardUrl] = useState(""),
     [ios, setIos] = useState(qr?.routingRules?.ios || ""),
     [android, setAndroid] = useState(qr?.routingRules?.android || ""),
     [campaignId, setCampaignId] = useState(qr?.campaignId || ""),
@@ -47,7 +58,14 @@ export default function QRStudio({
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [verified, setVerified] = useState(false);
-  const payload = saved ? `${appUrl}/s/${saved.shortCode}` : "";
+  const staticPayload = qrType === "wifi"
+    ? (ssid.trim() ? buildWifiPayload({ ssid, password: wifiPassword, security: wifiSecurity, hidden: wifiHidden }) : "")
+    : qrType === "vcard"
+      ? (vcardName.trim() ? buildVCardPayload({ name: vcardName, organization: vcardOrganization, phone: vcardPhone, email: vcardEmail, url: vcardUrl }) : "")
+      : qrType === "text" ? target : "";
+  const payload = qrType === "dynamic_url"
+    ? (saved ? `${appUrl}/s/${saved.shortCode}` : "")
+    : (staticPayload || (saved?.type === qrType ? saved.targetUrl : ""));
   useEffect(() => {
     let active = true;
     setVerified(false);
@@ -96,7 +114,8 @@ export default function QRStudio({
     try {
       const data = {
         title,
-        targetUrl: target,
+        type: qrType,
+        targetUrl: qrType === "dynamic_url" ? target : (staticPayload || target),
         isActive: saved?.isActive ?? true,
         styling: style,
         recordId: saved?.recordId || null,
@@ -173,16 +192,58 @@ export default function QRStudio({
             />
           </label>
           <label>
-            Destination URL
-            <input
-              type="url"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="https://your-website.com/menu"
-              required
-              maxLength={2048}
-            />
+            QR type
+            <select value={qrType} onChange={(e) => setQrType(e.target.value as QRType)}>
+              <option value="dynamic_url">Dynamic URL</option>
+              <option value="vcard">vCard / Contact</option>
+              <option value="wifi">Wi-Fi access</option>
+              <option value="text">Plain text</option>
+            </select>
           </label>
+          {qrType === "dynamic_url" && (
+            <label>
+              Destination URL
+              <input
+                type="url"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="https://your-website.com/menu"
+                required
+                maxLength={2048}
+              />
+            </label>
+          )}
+          {qrType === "wifi" && (
+            <div className="stack">
+              <div className="form-grid">
+                <label>Network name (SSID)<input value={ssid} onChange={(e) => setSsid(e.target.value)} required={!target} maxLength={100} /></label>
+                <label>Security<select value={wifiSecurity} onChange={(e) => setWifiSecurity(e.target.value as typeof wifiSecurity)}><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="nopass">No password</option></select></label>
+              </div>
+              {wifiSecurity !== "nopass" && <label>Password<input type="password" value={wifiPassword} onChange={(e) => setWifiPassword(e.target.value)} maxLength={100} /></label>}
+              <label className="checkbox-row"><input type="checkbox" checked={wifiHidden} onChange={(e) => setWifiHidden(e.target.checked)} /> Hidden network</label>
+              {!ssid && target && <small className="muted">Existing payload preserved. Enter a network name to replace it.</small>}
+            </div>
+          )}
+          {qrType === "vcard" && (
+            <div className="stack">
+              <div className="form-grid">
+                <label>Full name<input value={vcardName} onChange={(e) => setVcardName(e.target.value)} required={!target} maxLength={120} /></label>
+                <label>Organisation<input value={vcardOrganization} onChange={(e) => setVcardOrganization(e.target.value)} maxLength={120} /></label>
+              </div>
+              <div className="form-grid">
+                <label>Phone<input type="tel" value={vcardPhone} onChange={(e) => setVcardPhone(e.target.value)} maxLength={40} /></label>
+                <label>Email<input type="email" value={vcardEmail} onChange={(e) => setVcardEmail(e.target.value)} maxLength={190} /></label>
+              </div>
+              <label>Website<input type="url" value={vcardUrl} onChange={(e) => setVcardUrl(e.target.value)} maxLength={2048} /></label>
+              {!vcardName && target && <small className="muted">Existing vCard payload preserved. Enter a name to replace it.</small>}
+            </div>
+          )}
+          {qrType === "text" && (
+            <label>
+              Text payload
+              <textarea value={target} onChange={(e) => setTarget(e.target.value)} required maxLength={4096} rows={5} placeholder="Enter text to encode" />
+            </label>
+          )}
           <div className="form-grid">
             <label>
               QR colour
@@ -229,7 +290,7 @@ export default function QRStudio({
               </select>
             </label>
           </div>
-          <details>
+          {qrType === "dynamic_url" && <details>
             <summary>Device routing & expiry</summary>
             <div className="stack details-content">
               <label>
@@ -263,7 +324,7 @@ export default function QRStudio({
                 code does not redirect.
               </small>
             </div>
-          </details>
+          </details>}
           {error && (
             <p className="notice error" role="alert">
               {error}

@@ -44,22 +44,27 @@ export async function GET(
       : /Android/i.test(ua)
         ? "Android"
         : "Desktop";
-    const target = destination.safeParse(
-      (os === "iOS" && rules.ios) ||
-        (os === "Android" && rules.android) ||
-        qr.targetUrl,
-    );
+    const staticPayload = qr.type !== "dynamic_url" ? qr.targetUrl : null;
+    const target = staticPayload
+      ? { success: true as const, data: staticPayload }
+      : destination.safeParse(
+          (os === "iOS" && rules.ios) ||
+            (os === "Android" && rules.android) ||
+            qr.targetUrl,
+        );
     if (!target.success)
       return message(
         "This QR destination needs to be updated by its owner.",
         410,
       );
-    const parsed = new URL(target.data);
-    if (
-      parsed.origin === new URL(process.env.APP_URL!).origin &&
-      parsed.pathname.startsWith("/s/")
-    )
-      return message("Invalid QR destination.", 410);
+    if (!staticPayload) {
+      const parsed = new URL(target.data);
+      if (
+        parsed.origin === new URL(process.env.APP_URL!).origin &&
+        parsed.pathname.startsWith("/s/")
+      )
+        return message("Invalid QR destination.", 410);
+    }
     // Persist both events together before returning; serverless fire-and-forget loses events.
     if (
       !/bot|crawler|spider|preview|headless/i.test(ua) &&
@@ -133,7 +138,12 @@ export async function GET(
           }),
       );
     }
-    const response = NextResponse.redirect(target.data, 302);
+    const response = staticPayload
+      ? new NextResponse(staticPayload, {
+          status: 200,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        })
+      : NextResponse.redirect(target.data, 302);
     response.headers.set("Cache-Control", "no-store, max-age=0");
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;

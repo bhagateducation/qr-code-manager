@@ -52,7 +52,8 @@ export const systemSchema = z
   );
 export const qrSchema = z.object({
   title: name,
-  targetUrl: destination,
+  type: z.enum(["dynamic_url", "wifi", "vcard", "text"]).default("dynamic_url"),
+  targetUrl: z.string().trim().min(1).max(4096),
   recordId: z.string().max(80).nullable().optional(),
   campaignId: z.string().max(80).nullable().optional(),
   tagIds: z.array(z.string().max(80)).max(20).default([]),
@@ -71,6 +72,16 @@ export const qrSchema = z.object({
       expiresAt: z.iso.datetime().optional(),
     })
     .default({}),
+}).superRefine((value, context) => {
+  if (value.type === "dynamic_url") {
+    const result = destination.safeParse(value.targetUrl);
+    if (!result.success) context.addIssue({ code: "custom", path: ["targetUrl"], message: result.error.issues[0]?.message || "Use a public http or https address." });
+    return;
+  }
+  if (value.type === "wifi" && !/^WIFI:T:(WPA|WEP|nopass);S:.+;P:.*;H:(true|false);;$/.test(value.targetUrl))
+    context.addIssue({ code: "custom", path: ["targetUrl"], message: "Wi-Fi payload is invalid." });
+  if (value.type === "vcard" && !/^BEGIN:VCARD\nVERSION:3\.0\n[\s\S]+\nEND:VCARD$/.test(value.targetUrl))
+    context.addIssue({ code: "custom", path: ["targetUrl"], message: "vCard payload is invalid." });
 });
 export function validateRecord(
   fields: { key: string; type: string; isRequired: boolean }[],

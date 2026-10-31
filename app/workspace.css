@@ -665,6 +665,12 @@ tbody tr:last-child td {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.destination-payload {
+  color: #6e6282;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 .destination svg {
   flex-shrink: 0;
 }
