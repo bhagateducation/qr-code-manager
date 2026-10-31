@@ -8,6 +8,8 @@
 <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
 <script src="js/qrcode.min.js"></script>
 <script>if(!window.QRCode){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>')}</script>
+<script src="js/auth.js"></script>
+<script>Auth.requireAuth();</script>
 <style>
   :root {
     --ink: #17161D;
@@ -1184,6 +1186,7 @@
   }
 
   window.addEventListener('DOMContentLoaded', () => {
+    if (window.Auth) Auth.syncUI();
     generateLiveQR();
 
     const urlInput = document.getElementById('targetUrlInput');

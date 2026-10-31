@@ -6,6 +6,8 @@
 <title>QR Manager — System Builder</title>
 <script src="js/tailwindcss.js"></script>
 <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+<script src="js/auth.js"></script>
+<script>Auth.requireAuth();</script>
 <style>
   :root {
     --ink: #17161D;
@@ -1144,6 +1146,10 @@
       dropdownOpen = false;
       document.getElementById('type-dropdown').style.display = 'none';
     });
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.Auth) Auth.syncUI();
   });
 </script>
 

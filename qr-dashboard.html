@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QR Manager — Overview</title>
   <script src="js/tailwindcss.js"></script>
-<script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script src="js/auth.js"></script>
+  <script>Auth.requireAuth();</script>
   <style>
     :root {
       --ink: #17161D;
@@ -1455,6 +1457,11 @@
       e.preventDefault();
       document.querySelector('.search-bar input').focus();
     }
+  });
+
+  // Sync user profile & auth state
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.Auth) Auth.syncUI();
   });
 </script>
 
