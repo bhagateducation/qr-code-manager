@@ -4,7 +4,7 @@
  * Route Guards, Rate Limiting, and Session Management.
  */
 
-(function(window) {
+(function (window) {
   'use strict';
 
   const STORAGE_KEY_USERS = 'qrm_users_db_v1';
@@ -107,7 +107,7 @@
       userAttempts.lastTime = Date.now();
       attempts[email] = userAttempts;
       localStorage.setItem(STORAGE_KEY_ATTEMPTS, JSON.stringify(attempts));
-    } catch (e) {}
+    } catch (e) { }
   }
 
   function clearFailedAttempts(email) {
@@ -115,7 +115,7 @@
       const attempts = JSON.parse(localStorage.getItem(STORAGE_KEY_ATTEMPTS) || '{}');
       delete attempts[email];
       localStorage.setItem(STORAGE_KEY_ATTEMPTS, JSON.stringify(attempts));
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const Auth = {
@@ -141,7 +141,7 @@
         if (session && session.user && Date.now() <= session.expiresAt) {
           return session.user;
         }
-      } catch (e) {}
+      } catch (e) { }
       return null;
     },
 
@@ -261,7 +261,6 @@
       const user = Auth.getUser();
       if (!user) return;
 
-      const firstName = user.name.split(' ')[0] || user.name;
       const initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
 
       // Update avatars
@@ -279,7 +278,7 @@
         el.textContent = user.email;
       });
 
-      // Update workspace selectors & breadcrumbs
+      // Update workspace selectors
       document.querySelectorAll('.workspace-name, [data-workspace]').forEach(el => {
         el.textContent = user.workspace;
       });
@@ -294,16 +293,15 @@
         };
       });
 
-      // Also attach click logout to user chips if they have title or click
+      // Attach click handler to user chips/rows
       document.querySelectorAll('.user-row, .user-chip').forEach(chip => {
         if (!chip.getAttribute('data-logout-bound')) {
           chip.setAttribute('data-logout-bound', 'true');
           chip.setAttribute('title', 'Click to switch account or log out');
           chip.style.cursor = 'pointer';
           chip.addEventListener('click', (e) => {
-            // If click wasn't already on a child button
             if (e.target.closest('[title="Log out"]')) return;
-            if (confirm(`Logged in as ${user.name} (${user.email}). Would you like to log out?`)) {
+            if (confirm('Logged in as ' + user.name + ' (' + user.email + '). Would you like to log out?')) {
               Auth.logout();
             }
           });
@@ -314,3 +312,4 @@
 
   window.Auth = Auth;
 })(window);
+
