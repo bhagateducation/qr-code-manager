@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Code Manager SaaS — UI Design Showcase</title>
   <script src="js/tailwindcss.js"></script>
-<script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script src="js/gsap.min.js"></script>
+  <script>if(!window.gsap){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>')}</script>
+  <script src="js/motion-fx.js"></script>
   <style>
     :root {
       --ink: #17161D;
@@ -184,5 +187,22 @@
   <footer class="text-center py-6 text-xs text-[#666371] border-t border-[#E4E1E8] bg-[#FEFDFE]">
     QR Code Manager SaaS — UI Architecture Specification
   </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.MotionFX) {
+        MotionFX.apply3DTilt('main a.block', { maxTilt: 8, scale: 1.02 });
+      }
+      if (window.gsap) {
+        gsap.from('main a.block', {
+          y: 30,
+          opacity: 0,
+          stagger: 0.08,
+          duration: 0.7,
+          ease: 'power3.out'
+        });
+      }
+    });
+  </script>
 </body>
 </html>

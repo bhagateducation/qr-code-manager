@@ -6,6 +6,9 @@
   <title>QR Manager — Overview</title>
   <script src="js/tailwindcss.js"></script>
   <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script src="js/gsap.min.js"></script>
+  <script>if(!window.gsap){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>')}</script>
+  <script src="js/motion-fx.js"></script>
   <script src="js/auth.js"></script>
   <script>Auth.requireAuth();</script>
   <style>
@@ -294,13 +297,20 @@
     }
 
     .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 18px 20px;
-      transition: box-shadow 0.2s;
+      background: rgba(254, 253, 254, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(228, 225, 232, 0.85);
+      border-radius: 20px;
+      padding: 20px 22px;
+      box-shadow: 0 10px 30px -10px rgba(91, 67, 214, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+      transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+      position: relative;
     }
-    .stat-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+    .stat-card:hover {
+      box-shadow: 0 20px 45px -12px rgba(91, 67, 214, 0.16);
+      border-color: rgba(91, 67, 214, 0.3);
+    }
 
     .stat-label { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
     .stat-value { font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -0.5px; line-height: 1; }
@@ -1459,9 +1469,34 @@
     }
   });
 
-  // Sync user profile & auth state
+  // Sync user profile & auth state + 3D & GSAP motion
   document.addEventListener('DOMContentLoaded', () => {
     if (window.Auth) Auth.syncUI();
+
+    if (window.MotionFX) {
+      // 3D Tilt on Stat Cards & System Cards
+      MotionFX.apply3DTilt('.stat-card', { maxTilt: 8, scale: 1.02 });
+      MotionFX.apply3DTilt('.system-card', { maxTilt: 6, scale: 1.015 });
+      MotionFX.applyMagnetic('.primary-btn, button[onclick="location.href=\'qr-builder.html\'"]', 0.2);
+
+      // Animate KPI numbers on entrance
+      const statValues = document.querySelectorAll('.stat-value');
+      if (statValues[0]) MotionFX.animateCounter(statValues[0], 8, 1.2);
+      if (statValues[1]) MotionFX.animateCounter(statValues[1], 247, 1.5);
+      if (statValues[2]) MotionFX.animateCounter(statValues[2], 14832, 1.8);
+      if (statValues[3]) MotionFX.animateCounter(statValues[3], 1204, 1.6);
+    }
+
+    if (window.gsap) {
+      // Smooth card entrance
+      gsap.from('.stat-card', {
+        y: 25,
+        opacity: 0,
+        stagger: 0.1,
+        duration: 0.7,
+        ease: 'power3.out'
+      });
+    }
   });
 </script>
 

@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Code Manager — Universal QR-Powered Business SaaS</title>
   <script src="js/tailwindcss.js"></script>
-<script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script src="js/three.min.js"></script>
+  <script>if(!window.THREE){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')}</script>
+  <script src="js/gsap.min.js"></script>
+  <script>if(!window.gsap){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>')}</script>
+  <script src="js/ScrollTrigger.min.js"></script>
+  <script>if(!window.ScrollTrigger && window.gsap){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"><\/script>')}</script>
+  <script src="js/motion-fx.js"></script>
   <style>
     :root {
       --ink: #17161D;
@@ -23,6 +30,7 @@
       color: var(--ink);
       background-color: var(--page);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      overflow-x: hidden;
     }
     .mono { font-family: 'Courier New', Courier, monospace; }
     .bg-brand { background-color: var(--brand); }
@@ -34,15 +42,38 @@
     .text-muted { color: var(--muted); }
     .text-ink { color: var(--ink); }
     .glass-nav {
+      background: rgba(254, 253, 254, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .soft-card {
       background: rgba(254, 253, 254, 0.88);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(228, 225, 232, 0.8);
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 30px -10px rgba(91, 67, 214, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+      transition: all 0.35s cubic-bezier(0.23, 1, 0.32, 1);
     }
-    .card-hover {
-      transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    .soft-card:hover {
+      box-shadow: 0 22px 45px -12px rgba(91, 67, 214, 0.18), 0 8px 10px -4px rgba(0, 0, 0, 0.03);
+      border-color: rgba(91, 67, 214, 0.3);
     }
-    .card-hover:hover {
-      transform: translateY(-2px);
+    .ambient-glow {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .hero-canvas-wrap {
+      perspective: 1200px;
+      transform-style: preserve-3d;
+    }
+  </style>
       box-shadow: 0 12px 28px -6px rgba(23, 22, 29, 0.08);
     }
   </style>
@@ -163,8 +194,25 @@
         </div>
       </div>
 
+      <!-- Interactive Three.js 3D Hero Monolith Stage -->
+      <div class="mt-8 mb-4 relative max-w-lg mx-auto flex flex-col items-center justify-center">
+        <!-- Soft glowing backdrops -->
+        <div class="ambient-glow bg-[#5B43D6] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-75 opacity-25"></div>
+        <div class="ambient-glow bg-[#10B981] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-50 opacity-15"></div>
+
+        <div class="relative w-full h-[320px] sm:h-[360px] flex items-center justify-center cursor-grab active:cursor-grabbing">
+          <div id="hero-3d-scene" class="w-full h-full flex items-center justify-center"></div>
+          
+          <div class="absolute bottom-2 px-3.5 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-line text-[11px] font-medium text-muted pointer-events-none shadow-md flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="font-semibold text-ink">Three.js 3D QR Matrix</span>
+            <span class="text-gray-400">• Drag or hover to inspect</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Realistic Hero Product Mockup -->
-      <div class="mt-12 relative max-w-5xl mx-auto text-left">
+      <div class="mt-8 relative max-w-5xl mx-auto text-left product-mockup">
         <!-- Floating Badges -->
         <div class="hidden lg:flex absolute -top-5 -left-6 z-20 items-center gap-2 bg-surface px-4 py-2 rounded-xl shadow-lg border border-line text-xs font-semibold">
           <span class="w-2.5 h-2.5 rounded-full bg-brand"></span>
@@ -899,5 +947,24 @@
     </div>
   </footer>
 
+  <!-- MotionFX Initialization -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.MotionFX) {
+        // 1. Initialize Three.js 3D Holographic Monolith
+        MotionFX.createHero3DScene('hero-3d-scene');
+
+        // 2. 3D Perspective Tilt on product mockup & cards
+        MotionFX.apply3DTilt('.product-mockup', { maxTilt: 6, scale: 1.01 });
+        MotionFX.apply3DTilt('.grid > div.rounded-2xl, .p-6.rounded-2xl, .p-8.rounded-2xl', { maxTilt: 8, scale: 1.02 });
+
+        // 3. Framer Motion magnetic buttons
+        MotionFX.applyMagnetic('a.bg-brand, a.bg-white.text-brand', 0.25);
+
+        // 4. GSAP Scroll reveals
+        MotionFX.initScrollReveals();
+      }
+    });
+  </script>
 </body>
 </html>

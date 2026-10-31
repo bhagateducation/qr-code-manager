@@ -8,6 +8,9 @@
 <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
 <script src="js/qrcode.min.js"></script>
 <script>if(!window.QRCode){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>')}</script>
+<script src="js/gsap.min.js"></script>
+<script>if(!window.gsap){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>')}</script>
+<script src="js/motion-fx.js"></script>
 <script src="js/auth.js"></script>
 <script>Auth.requireAuth();</script>
 <style>
@@ -73,7 +76,18 @@
   .range-slider { width: 100%; accent-color: var(--brand); cursor: pointer; }
   input[type="text"], input[type="url"] { border: 1.5px solid var(--line); border-radius: 7px; padding: 8px 12px; font-size: 13px; background: var(--surface); color: var(--ink); width: 100%; outline: none; transition: border-color 0.15s; }
   input[type="text"]:focus, input[type="url"]:focus { border-color: var(--brand); }
-  .phone-frame { border: 2.5px solid #D1D5DB; border-radius: 28px; overflow: hidden; background: white; padding: 0; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+  .phone-frame {
+    border: 3px solid #1F1D2B;
+    border-radius: 38px;
+    overflow: hidden;
+    background: #FFFFFF;
+    padding: 0;
+    box-shadow: 0 25px 60px -15px rgba(23, 22, 29, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.3s ease;
+  }
+  .preview-panel {
+    perspective: 1200px;
+  }
   .phone-screen { padding: 12px; }
   .download-btn { display: flex; align-items: center; justify-content: center; gap-8px; background: var(--brand); color: white; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; transition: opacity 0.15s; }
   .download-btn:hover { opacity: 0.9; }
@@ -1188,6 +1202,12 @@
   window.addEventListener('DOMContentLoaded', () => {
     if (window.Auth) Auth.syncUI();
     generateLiveQR();
+
+    if (window.MotionFX) {
+      // 3D Phone Perspective Tilt
+      MotionFX.apply3DTilt('.phone-frame', { maxTilt: 12, scale: 1.02 });
+      MotionFX.applyMagnetic('.download-btn, #nextStepBtn', 0.22);
+    }
 
     const urlInput = document.getElementById('targetUrlInput');
     if (urlInput) {

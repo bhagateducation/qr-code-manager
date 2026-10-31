@@ -6,6 +6,9 @@
   <title>Create Your Account — QR Code Manager SaaS</title>
   <script src="js/tailwindcss.js"></script>
   <script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+  <script src="js/gsap.min.js"></script>
+  <script>if(!window.gsap){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"><\/script>')}</script>
+  <script src="js/motion-fx.js"></script>
   <script src="js/auth.js"></script>
   <style>
     :root {
@@ -21,12 +24,16 @@
     }
   </style>
 </head>
-<body class="bg-[#F5F4F7] text-[#17161D] min-h-screen flex flex-col justify-between font-sans antialiased selection:bg-[#EEEAFE]">
+<body class="bg-[#F5F4F7] text-[#17161D] min-h-screen flex flex-col justify-between font-sans antialiased selection:bg-[#EEEAFE] relative overflow-x-hidden">
+
+  <!-- Ambient Glowing Blurred Orbs -->
+  <div class="fixed top-12 right-1/4 w-96 h-96 bg-[#5B43D6]/15 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse"></div>
+  <div class="fixed bottom-12 left-1/4 w-96 h-96 bg-[#16794B]/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
   <!-- Top Simple Nav -->
-  <header class="py-4 px-6 flex items-center justify-between">
+  <header class="py-4 px-6 flex items-center justify-between relative z-10">
     <a href="index.html" class="flex items-center gap-2.5 text-decoration-none">
-      <div class="w-8 h-8 rounded-lg bg-[#5B43D6] text-white flex items-center justify-center font-bold">
+      <div class="w-8 h-8 rounded-xl bg-[#5B43D6] text-white flex items-center justify-center font-bold shadow-md shadow-[#5B43D6]/25">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3z"/></svg>
       </div>
       <span class="font-bold text-lg tracking-tight text-[#17161D]">QR<span class="text-[#5B43D6]">Manager</span></span>
@@ -37,8 +44,8 @@
   </header>
 
   <!-- Register Card Container -->
-  <main class="flex-1 flex items-center justify-center px-4 py-8">
-    <div class="max-w-md w-full bg-[#FEFDFE] border border-[#E4E1E8] rounded-2xl p-7 sm:p-9 shadow-xl relative">
+  <main class="flex-1 flex items-center justify-center px-4 py-8 relative z-10">
+    <div id="authCard" class="max-w-md w-full bg-[#FEFDFE]/90 backdrop-blur-2xl border border-white/80 rounded-3xl p-7 sm:p-9 shadow-[0_20px_50px_-15px_rgba(91,67,214,0.15)] relative">
       
       <!-- Card Header -->
       <div class="text-center mb-6">
@@ -243,10 +250,25 @@
       }
     }
 
-    // Redirect if already logged in
+    // Redirect if already logged in & Init Motion
     document.addEventListener('DOMContentLoaded', () => {
       if (Auth.isLoggedIn()) {
         window.location.href = 'qr-dashboard.html';
+        return;
+      }
+
+      if (window.MotionFX) {
+        MotionFX.apply3DTilt('#authCard', { maxTilt: 6, scale: 1.01 });
+        MotionFX.applyMagnetic('#submitBtn', 0.2);
+      }
+      if (window.gsap) {
+        gsap.from('#authCard', {
+          y: 40,
+          opacity: 0,
+          scale: 0.94,
+          duration: 0.85,
+          ease: 'power3.out'
+        });
       }
     });
   </script>
