@@ -44,12 +44,14 @@ export type QR = {
   title: string;
   shortCode: string;
   targetUrl: string;
+  type?: string;
   isActive: boolean;
   scanCount: number;
   styling: { dark: string; light: string; errorCorrectionLevel: string };
   routingRules: { ios?: string; android?: string; expiresAt?: string };
   recordId?: string | null;
   campaignId?: string | null;
+  campaign?: { id: string; name: string } | null;
   tagIds?: string[];
   tags?: { tag: { id: string; name: string; color: string } }[];
 };
@@ -272,25 +274,56 @@ export default function Dashboard() {
             Printed once. Update destinations whenever you need.
           </p>
         </div>
-        <form
-          className="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPage(1);
-            setQuery(search);
-          }}
-        >
-          <Search size={17} />
-          <input
-            aria-label="Search QR codes"
-            placeholder="Search codes…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button className="button small" type="submit">
-            Search
+        <div className="table-heading-actions">
+          <button
+            className="button small"
+            type="button"
+            onClick={() =>
+              saveFile(
+                "qr-manager-codes.csv",
+                [
+                  ["Title", "Type", "Short code", "QR link", "Destination", "Status", "Scans", "Campaign", "Tags"],
+                  ...data.qrCodes.map((qr) => [
+                    qr.title,
+                    qr.type || "dynamic_url",
+                    qr.shortCode,
+                    `${data.appUrl}/s/${qr.shortCode}`,
+                    qr.targetUrl,
+                    qr.isActive ? "Active" : "Paused",
+                    qr.scanCount,
+                    qr.campaign?.name || "",
+                    qr.tags?.map((item) => item.tag.name).join(" | ") || "",
+                  ]),
+                ]
+                  .map((row) => row.map(csvCell).join(","))
+                  .join("\r\n"),
+                "text/csv;charset=utf-8",
+              )
+            }
+          >
+            <Download size={15} />
+            Export page
           </button>
-        </form>
+          <form
+            className="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              setQuery(search);
+            }}
+          >
+            <Search size={17} />
+            <input
+              aria-label="Search QR codes"
+              placeholder="Search codes…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button className="button small" type="submit">
+              Search
+            </button>
+          </form>
+        </div>
       </div>
       <div className="table-scroll">
         <table>
