@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String       @unique
+  plan        String       @default("pro")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users       User[]
+  systems     System[]
+  qrCodes     QRCode[]
+  webhooks    Webhook[]
+
+  @@map("workspaces")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         String     @default("admin") // owner, admin, editor, viewer
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("users")
+}
+
+model System {
+  id           String        @id @default(uuid())
+  workspaceId  String
+  name         String
+  icon         String        @default("layers")
+  description  String?
+  statuses     Json?         // JSON array of custom status pipeline
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fields       CustomField[]
+  records      Record[]
+
+  @@index([workspaceId])
+  @@map("systems")
+}
+
+model CustomField {
+  id         String    @id @default(uuid())
+  systemId   String
+  key        String
+  label      String
+  type       String    // text, number, date, url, image, status, json, phone, currency, etc.
+  isRequired Boolean   @default(false)
+  isUnique   Boolean   @default(false)
+  options    Json?     // select options, min/max, format
+  order      Int       @default(0)
+
+  system     System    @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@index([systemId])
+  @@map("custom_fields")
+}
+
+model Record {
+  id         String     @id @default(uuid())
+  systemId   String
+  title      String
+  data       Json       // Key-value store of custom field values
+  status     String     @default("active")
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  system     System     @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  qrCodes    QRCode[]
+
+  @@index([systemId])
+  @@map("records")
+}
+
+model QRCode {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  recordId     String?
+  shortCode    String     @unique // e.g. "acme-qr-928"
+  title        String
+  type         String     @default("dynamic_url") // dynamic_url, vcard, menu, wifi, product, etc.
+  targetUrl    String
+  routingRules Json?      // device, schedule, or geo redirection
+  styling      Json?      // fgColor, bgColor, pattern, corner, logo, frame
+  scanCount    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  record       Record?    @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  scanLogs     ScanLog[]
+
+  @@index([workspaceId])
+  @@index([recordId])
+  @@index([shortCode])
+  @@map("qr_codes")
+}
+
+model ScanLog {
+  id        String   @id @default(uuid())
+  qrCodeId  String
+  ipHash    String?
+  country   String?  @default("Unknown")
+  city      String?  @default("Unknown")
+  device    String?  @default("Mobile")
+  os        String?  @default("Unknown")
+  browser   String?  @default("Unknown")
+  scannedAt DateTime @default(now())
+
+  qrCode    QRCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+
+  @@index([qrCodeId])
+  @@index([scannedAt])
+  @@map("scan_logs")
+}
+
+model Webhook {
+  id          String     @id @default(uuid())
+  workspaceId String
+  url         String
+  secret      String
+  events      Json       // array of events: ["scan.created", "record.updated"]
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("webhooks")
+}
