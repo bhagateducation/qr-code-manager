@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && prisma migrate deploy && next build --webpack",
+    "postinstall": "node scripts/ensure-prisma-executable.mjs",
     "start": "next start",
     "lint": "tsc --noEmit",
     "db:push": "prisma db push",
