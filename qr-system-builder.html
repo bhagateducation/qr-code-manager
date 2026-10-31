@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QR Manager — System Builder</title>
+<script src="js/tailwindcss.js"></script>
+<script>if(!window.tailwind){document.write('<script src="https://cdn.tailwindcss.com"><\/script>')}</script>
+<style>
+  :root {
+    --ink: #17161D;
+    --muted: #666371;
+    --page: #F5F4F7;
+    --surface: #FEFDFE;
+    --line: #E4E1E8;
+    --brand: #5B43D6;
+    --brand-soft: #EEEAFE;
+    --success: #16794B;
+    --warning: #9A6108;
+    --danger: #B43B47;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--page); color: var(--ink); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+  /* Sidebar */
+  .sidebar { width: 252px; min-height: 100vh; background: #141318; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; z-index: 40; }
+  .sidebar-logo { padding: 18px 20px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .logo-mark { width: 32px; height: 32px; background: var(--brand); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+  .nav-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; color: rgba(255,255,255,0.3); padding: 14px 20px 6px; text-transform: uppercase; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 20px; color: rgba(255,255,255,0.55); font-size: 13.5px; font-weight: 500; cursor: pointer; transition: all 0.15s; border-radius: 0; text-decoration: none; }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .nav-item.active { color: #fff; background: rgba(91,67,214,0.25); border-right: 3px solid var(--brand); }
+  .nav-item .badge { margin-left: auto; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; }
+  .nav-item.active .badge { background: rgba(91,67,214,0.4); color: #a89bf0; }
+  .nav-sub { padding: 3px 0 3px 48px; }
+  .nav-sub-item { display: flex; align-items: center; gap: 8px; padding: 5px 10px; color: rgba(255,255,255,0.4); font-size: 12.5px; cursor: pointer; border-radius: 4px; transition: all 0.15s; }
+  .nav-sub-item:hover { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.05); }
+  .nav-sub-item.active { color: #c4b8ff; background: rgba(91,67,214,0.15); }
+  .sidebar-footer { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.07); }
+  .user-chip { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+  .user-chip:hover { background: rgba(255,255,255,0.07); }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#7c5cfc,#5B43D6); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+
+  /* Main layout */
+  .main-wrap { margin-left: 252px; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Topbar */
+  .topbar { height: 54px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 24px; gap: 14px; position: sticky; top: 0; z-index: 30; }
+  .topbar-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .topbar-breadcrumb span { color: var(--ink); font-weight: 600; }
+  .topbar-search { flex: 1; max-width: 340px; margin-left: 20px; }
+  .search-box { width: 100%; background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px 6px 34px; font-size: 13px; color: var(--ink); outline: none; }
+  .search-wrap { position: relative; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .topbar-icon-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+  .topbar-icon-btn:hover { background: var(--page); color: var(--ink); }
+
+  /* Page header */
+  .page-header { background: var(--surface); border-bottom: 1px solid var(--line); padding: 16px 24px 0; }
+  .page-title-row { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+  .system-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .page-title { font-size: 19px; font-weight: 700; color: var(--ink); }
+  .page-subtitle { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+  .page-subtitle span { color: var(--ink); font-weight: 500; }
+  .header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  .btn-ghost:hover { background: var(--page); color: var(--ink); }
+  .btn-outline { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+  .btn-outline:hover { background: var(--page); }
+  .btn-brand { background: var(--brand); color: #fff; }
+  .btn-brand:hover { background: #4a34c0; }
+  .btn-success { background: #d1fae5; color: var(--success); }
+  .btn-success:hover { background: #a7f3d0; }
+  .btn-icon { width: 34px; height: 34px; padding: 0; justify-content: center; }
+
+  /* Tabs */
+  .tab-row { display: flex; align-items: center; gap: 0; overflow-x: auto; }
+  .tab { padding: 9px 16px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.15s; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+
+  /* Content area */
+  .content-area { padding: 20px 24px; flex: 1; }
+  .schema-grid { display: grid; grid-template-columns: 40% 60%; gap: 16px; height: calc(100vh - 200px); }
+
+  /* Card */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .card-header { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .card-title { font-size: 13.5px; font-weight: 700; color: var(--ink); flex: 1; }
+  .card-body { overflow-y: auto; max-height: calc(100% - 49px); }
+
+  /* Field rows */
+  .field-row { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.12s; group: field; }
+  .field-row:last-child { border-bottom: none; }
+  .field-row:hover { background: var(--page); }
+  .field-row.active { background: var(--brand-soft); }
+  .field-row:hover .field-actions, .field-row.active .field-actions { opacity: 1; }
+  .drag-handle { color: #ccc; cursor: grab; font-size: 12px; flex-shrink: 0; line-height: 1; letter-spacing: -1px; }
+  .field-icon { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .field-info { flex: 1; min-width: 0; }
+  .field-name { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 5px; }
+  .field-type { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .badge-pill { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 20px; }
+  .badge-req { background: #fff0f0; color: var(--danger); }
+  .badge-uniq { background: #f0f0ff; color: var(--brand); }
+  .field-actions { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+  .action-btn { width: 26px; height: 26px; border-radius: 5px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; font-weight: 600; transition: all 0.12s; }
+  .action-btn:hover { background: var(--page); color: var(--ink); }
+  .action-btn.danger:hover { background: #fef2f2; color: var(--danger); }
+
+  /* Add field */
+  .add-field-row { padding: 10px 14px; display: flex; align-items: center; gap: 8px; color: var(--brand); font-size: 13px; font-weight: 600; cursor: pointer; border-top: 1px solid var(--line); transition: background 0.12s; position: relative; }
+  .add-field-row:hover { background: var(--brand-soft); }
+
+  /* Field type dropdown */
+  .type-dropdown { position: absolute; bottom: 44px; left: 10px; width: 520px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 50; padding: 14px; display: none; }
+  .type-dropdown.open { display: block; }
+  .type-group-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; margin-top: 12px; }
+  .type-group-label:first-child { margin-top: 0; }
+  .type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .type-option { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: 7px; cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--ink); border: 1px solid transparent; transition: all 0.12s; }
+  .type-option:hover { background: var(--brand-soft); border-color: rgba(91,67,214,0.2); color: var(--brand); }
+  .type-icon { width: 22px; height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+
+  /* Detail panel */
+  .detail-panel { display: flex; flex-direction: column; gap: 0; overflow-y: auto; }
+  .detail-section { padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .detail-section:last-child { border-bottom: none; }
+  .form-label { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-input { width: 100%; background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13.5px; color: var(--ink); outline: none; transition: border-color 0.15s; }
+  .form-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(91,67,214,0.1); }
+  .form-select { width: 100%; background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13.5px; color: var(--ink); outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666371' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  /* Toggle */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .toggle-desc { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #d1d5db; border-radius: 20px; transition: 0.2s; }
+  .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .toggle input:checked + .toggle-slider { background: var(--brand); }
+  .toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+  /* Status editor */
+  .status-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-top: 14px; overflow: hidden; }
+  .status-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .status-item:last-child { border-bottom: none; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .status-name { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
+  .status-meta { font-size: 11px; color: var(--muted); }
+  .status-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; background: var(--page); color: var(--muted); border: 1px solid var(--line); }
+
+  /* Field ID */
+  .field-id { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11.5px; color: var(--muted); background: var(--page); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+
+  /* Permissions row */
+  .perm-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--page); border-radius: 8px; font-size: 12.5px; color: var(--muted); border: 1px solid var(--line); }
+  .perm-icon { color: var(--brand); }
+
+  /* Modal overlay */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(17,15,30,0.45); z-index: 100; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+  .modal { background: var(--surface); border-radius: 14px; width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06); overflow: hidden; animation: modalIn 0.2s ease; }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  .modal-header { padding: 20px 20px 14px; }
+  .modal-icon { width: 40px; height: 40px; border-radius: 10px; background: #fef2f2; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+  .modal-title { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .modal-body { padding: 0 20px 16px; }
+  .impact-list { background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  .impact-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; color: var(--muted); }
+  .impact-item span { color: var(--ink); font-weight: 600; }
+  .warn-box { display: flex; align-items: flex-start; gap: 8px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .warn-icon { flex-shrink: 0; margin-top: 1px; }
+  .warn-text { font-size: 12.5px; color: #92400e; font-weight: 500; line-height: 1.5; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #9a3040; }
+
+  /* Misc */
+  .dot-grid { color: var(--muted); letter-spacing: -0.5px; font-size: 11px; }
+  .section-divider { border: none; border-top: 1px solid var(--line); margin: 0; }
+
+  /* Left panel layout */
+  .left-col { display: flex; flex-direction: column; height: 100%; }
+  .left-col .card { flex: 1; display: flex; flex-direction: column; }
+  .left-col .card .card-body { flex: 1; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <a href="index.html" class="sidebar-logo" style="text-decoration:none;display:block;">
+    <div class="logo-mark">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="8" height="8" rx="1.5" fill="white"/>
+        <rect x="13" y="3" width="8" height="8" rx="1.5" fill="rgba(255,255,255,0.5)"/>
+        <rect x="3" y="13" width="8" height="8" rx="1.5" fill="rgba(255,255,255,0.5)"/>
+        <rect x="15" y="15" width="4" height="4" rx="1" fill="white"/>
+      </svg>
+    </div>
+    <div>
+      <div style="color:#fff;font-size:14px;font-weight:700;letter-spacing:-0.3px;">QR Manager</div>
+      <div style="color:rgba(255,255,255,0.35);font-size:10.5px;">Pro Plan · Acme Corp</div>
+    </div>
+  </a>
+
+  <div class="sidebar-nav">
+    <div class="nav-section-label">Workspace</div>
+    <a class="nav-item" href="qr-builder.html">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-item active" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h8m-8 6h16"/></svg>
+      Systems
+      <span class="badge">7</span>
+    </a>
+
+    <!-- Subsystems -->
+    <div class="nav-sub">
+      <div class="nav-sub-item active">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        Inventory System
+      </div>
+      <div class="nav-sub-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        Employee IDs
+      </div>
+      <div class="nav-sub-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        Asset Tracker
+      </div>
+    </div>
+
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      QR Campaigns
+      <span class="badge">3</span>
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17 14h.01M14 17h7M17 21v-4"/></svg>
+      QR Codes
+      <span class="badge">1.2k</span>
+    </a>
+
+    <div class="nav-section-label">Tools</div>
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Forms
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Automations
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      Analytics
+    </a>
+
+    <div class="nav-section-label">Account</div>
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Members
+    </a>
+    <a class="nav-item" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 4.93A10 10 0 0 1 4.93 19.07"/></svg>
+      Settings
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <div class="avatar">R</div>
+      <div style="flex:1;min-width:0;">
+        <div style="color:rgba(255,255,255,0.85);font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Rahul Singh</div>
+        <div style="color:rgba(255,255,255,0.35);font-size:11px;">Admin</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main-wrap">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-breadcrumb">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h8m-8 6h16"/></svg>
+      Systems
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+      <span>Inventory System</span>
+    </div>
+
+    <div class="topbar-search">
+      <div class="search-wrap">
+        <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" class="search-box" placeholder="Search fields, records…" />
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+        <a href="index.html" style="border:1.5px solid var(--line);background:var(--surface);color:var(--ink);padding:5px 11px;border-radius:7px;font-size:12px;text-decoration:none;font-weight:500;display:inline-flex;align-items:center;gap:5px;transition:border-color 0.15s;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>Live Site</span>
+        </a>
+        <a href="scan-preview.html" style="border:1.5px solid var(--line);background:var(--surface);color:var(--brand);padding:5px 11px;border-radius:7px;font-size:12px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:border-color 0.15s;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          <span>Scan Demo</span>
+        </a>
+      </div>
+
+      <div class="topbar-icon-btn" title="Notifications">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </div>
+      <div class="topbar-icon-btn" title="Help">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      </div>
+      <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#7c5cfc,#5B43D6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;cursor:pointer;">R</div>
+    </div>
+  </header>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-title-row">
+      <div class="system-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="7" width="20" height="14" rx="2" fill="#5B43D6" opacity="0.15"/>
+          <rect x="2" y="7" width="20" height="14" rx="2" stroke="#5B43D6" stroke-width="1.5"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="#5B43D6" stroke-width="1.5"/>
+          <path d="M12 12v4M10 14h4" stroke="#5B43D6" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="page-title">Inventory System</div>
+        <div class="page-subtitle">
+          <span>156</span> records · <span>156</span> QR codes · Last updated <span>2 hours ago</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="qr-builder.html" class="btn btn-outline" style="text-decoration:none;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add record
+        </button>
+        <button class="btn btn-success">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Generate QRs
+        </a>
+        <button class="btn btn-brand">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab row -->
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab(this,'schema')">Schema</div>
+      <div class="tab" onclick="switchTab(this,'fields')">Fields</div>
+      <div class="tab" onclick="switchTab(this,'statuses')">Statuses</div>
+      <div class="tab" onclick="switchTab(this,'views')">Views</div>
+      <div class="tab" onclick="switchTab(this,'forms')">Forms</div>
+      <div class="tab" onclick="switchTab(this,'qr-rules')">QR Rules</div>
+      <div class="tab" onclick="switchTab(this,'functions')">Functions</div>
+      <div class="tab" onclick="switchTab(this,'automations')">
+        Automations
+        <span style="background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:4px;">2</span>
+      </div>
+      <div class="tab" onclick="switchTab(this,'permissions')">Permissions</div>
+      <div class="tab" onclick="switchTab(this,'settings')">Settings</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content-area" id="tab-schema">
+    <div class="schema-grid">
+
+      <!-- LEFT COLUMN: Field List + Status -->
+      <div class="left-col">
+        <div class="card" style="flex:1;display:flex;flex-direction:column;">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <span class="card-title">Fields <span style="font-weight:400;color:var(--muted);font-size:12px;">(14)</span></span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+                Filter
+              </button>
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                Edit all
+              </button>
+            </div>
+          </div>
+          <div class="card-body" style="overflow-y:auto;flex:1;">
+            <!-- Field 1 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-1">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#ede9fe;">📝</div>
+              <div class="field-info">
+                <div class="field-name">
+                  Product Name
+                  <span class="badge-pill badge-req">*</span>
+                </div>
+                <div class="field-type">Short text</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn" title="Edit">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                </button>
+                <button class="action-btn" title="Hide">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+                </button>
+                <button class="action-btn danger" title="Delete" onclick="openDeleteModal(event)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Field 2 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-2">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#dbeafe;">🔢</div>
+              <div class="field-info">
+                <div class="field-name">
+                  SKU
+                  <span class="badge-pill badge-req">*</span>
+                  <span class="badge-pill badge-uniq">Unique</span>
+                </div>
+                <div class="field-type">Serial number / Barcode</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 3 — ACTIVE (Price) -->
+            <div class="field-row active" onclick="selectField(this,'price-panel')" id="fr-3">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#d1fae5;">💲</div>
+              <div class="field-info">
+                <div class="field-name">
+                  Price
+                  <span class="badge-pill badge-req">*</span>
+                </div>
+                <div class="field-type">Currency (USD)</div>
+              </div>
+              <div class="field-actions" style="opacity:1;">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 4 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-4">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#fef9c3;">🏷️</div>
+              <div class="field-info">
+                <div class="field-name">MRP</div>
+                <div class="field-type">Currency (USD)</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 5 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-5">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#fce7f3;">📦</div>
+              <div class="field-info">
+                <div class="field-name">Category</div>
+                <div class="field-type">Single select · Electronics, Clothing, Food…</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 6 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-6">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#e0f2fe;">🏪</div>
+              <div class="field-info">
+                <div class="field-name">Stock Count <span class="badge-pill badge-req">*</span></div>
+                <div class="field-type">Number</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 7 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-7">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#f0fdf4;">📍</div>
+              <div class="field-info">
+                <div class="field-name">Location</div>
+                <div class="field-type">Short text</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 8 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-8">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#fef3c7;">🖼️</div>
+              <div class="field-info">
+                <div class="field-name">Product Images</div>
+                <div class="field-type">File / Image · Multiple</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 9 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-9">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#e0e7ff;">📅</div>
+              <div class="field-info">
+                <div class="field-name">Purchase Date</div>
+                <div class="field-type">Date</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 10 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-10">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#fee2e2;">⚠️</div>
+              <div class="field-info">
+                <div class="field-name">Status</div>
+                <div class="field-type">Status field · 4 states</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 11 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-11">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#f3f4f6;">🏷️</div>
+              <div class="field-info">
+                <div class="field-name">Tags</div>
+                <div class="field-type">Manual tags</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 12 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-12">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#fdf4ff;">📎</div>
+              <div class="field-info">
+                <div class="field-name">Warranty Info</div>
+                <div class="field-type">Long text</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 13 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-13">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#ede9fe;">🔗</div>
+              <div class="field-info">
+                <div class="field-name">Supplier</div>
+                <div class="field-type">Relationship → Suppliers system</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Field 14 -->
+            <div class="field-row" onclick="selectField(this,'price-panel')" id="fr-14">
+              <span class="drag-handle">⋮⋮</span>
+              <div class="field-icon" style="background:#ecfdf5;">🧮</div>
+              <div class="field-info">
+                <div class="field-name">Total Value</div>
+                <div class="field-type">Formula · Stock × Price</div>
+              </div>
+              <div class="field-actions">
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="action-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="2" y1="2" x2="22" y2="22"/></svg></button>
+                <button class="action-btn danger" onclick="openDeleteModal(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+              </div>
+            </div>
+
+            <!-- Add field -->
+            <div class="add-field-row" onclick="toggleTypeDropdown()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add field
+
+              <!-- Type dropdown -->
+              <div class="type-dropdown" id="type-dropdown">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                  <div style="font-size:13px;font-weight:700;color:var(--ink);">Choose field type</div>
+                  <button onclick="toggleTypeDropdown()" style="background:none;border:none;cursor:pointer;color:var(--muted);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                <div style="background:var(--page);border:1px solid var(--line);border-radius:7px;padding:6px 10px;display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input style="border:none;background:transparent;outline:none;font-size:12.5px;color:var(--ink);width:100%;" placeholder="Search field types…">
+                </div>
+
+                <div class="type-group-label">Text</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#ede9fe;">📝</div>Short text</div>
+                  <div class="type-option"><div class="type-icon" style="background:#ede9fe;">📄</div>Long text</div>
+                  <div class="type-option"><div class="type-icon" style="background:#ede9fe;">✍️</div>Rich text</div>
+                </div>
+
+                <div class="type-group-label">Numbers</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#dbeafe;">🔢</div>Number</div>
+                  <div class="type-option"><div class="type-icon" style="background:#d1fae5;">💲</div>Currency</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fef9c3;">%</div>Percentage</div>
+                  <div class="type-option"><div class="type-icon" style="background:#ecfdf5;">🧮</div>Formula</div>
+                </div>
+
+                <div class="type-group-label">Choice</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#fce7f3;">◉</div>Single select</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fce7f3;">☑</div>Multi-select</div>
+                  <div class="type-option"><div class="type-icon" style="background:#f3f4f6;">✓</div>Checkbox</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fee2e2;">⚡</div>Status</div>
+                </div>
+
+                <div class="type-group-label">Date / Time</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#e0e7ff;">📅</div>Date</div>
+                  <div class="type-option"><div class="type-icon" style="background:#e0e7ff;">🕐</div>Time</div>
+                  <div class="type-option"><div class="type-icon" style="background:#e0e7ff;">🗓</div>Date-time</div>
+                </div>
+
+                <div class="type-group-label">Contact</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#fdf4ff;">📧</div>Email</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fdf4ff;">📞</div>Phone</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fdf4ff;">🔗</div>URL</div>
+                </div>
+
+                <div class="type-group-label">Media</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#fef3c7;">📁</div>File</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fef3c7;">🖼️</div>Image</div>
+                  <div class="type-option"><div class="type-icon" style="background:#fef3c7;">🎬</div>Video</div>
+                </div>
+
+                <div class="type-group-label">Relations</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#ede9fe;">🔗</div>Relationship</div>
+                  <div class="type-option"><div class="type-icon" style="background:#ede9fe;">🔍</div>Lookup</div>
+                  <div class="type-option"><div class="type-icon" style="background:#ede9fe;">📊</div>Rollup</div>
+                </div>
+
+                <div class="type-group-label">Advanced</div>
+                <div class="type-grid">
+                  <div class="type-option"><div class="type-icon" style="background:#f0fdf4;">#</div>Auto-number</div>
+                  <div class="type-option"><div class="type-icon" style="background:#f0fdf4;">{ }</div>JSON</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Configurator -->
+        <div class="status-card">
+          <div class="card-header" style="padding:11px 14px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span class="card-title" style="font-size:12.5px;">Status Lifecycle</span>
+            <span style="font-size:11px;color:var(--muted);">4 states</span>
+          </div>
+          <div class="status-item">
+            <div class="status-dot" style="background:#16a34a;"></div>
+            <div class="status-name">In Stock</div>
+            <span class="status-badge">Default</span>
+            <button class="action-btn"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+          </div>
+          <div class="status-item">
+            <div class="status-dot" style="background:#d97706;"></div>
+            <div class="status-name">Low Stock</div>
+            <span class="status-meta">Triggers alert at ≤ 5 units</span>
+            <button class="action-btn"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+          </div>
+          <div class="status-item">
+            <div class="status-dot" style="background:#dc2626;"></div>
+            <div class="status-name">Out of Stock</div>
+            <span class="status-meta" style="margin-left:auto;"></span>
+            <button class="action-btn"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+          </div>
+          <div class="status-item" style="border-bottom:none;">
+            <div class="status-dot" style="background:#9ca3af;"></div>
+            <div class="status-name" style="color:var(--muted);">Discontinued</div>
+            <button class="action-btn"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+          </div>
+          <div style="padding:10px 14px;border-top:1px solid var(--line);">
+            <button style="background:none;border:none;color:var(--brand);font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;padding:0;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add status
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Field Detail Editor -->
+      <div class="card" style="height:100%;overflow:hidden;">
+        <div class="card-header">
+          <div style="width:26px;height:26px;border-radius:7px;background:#d1fae5;display:flex;align-items:center;justify-content:center;font-size:13px;">💲</div>
+          <span class="card-title">Edit Field — Price</span>
+          <span style="font-size:11px;color:var(--muted);background:var(--page);border:1px solid var(--line);padding:2px 8px;border-radius:20px;">Currency</span>
+        </div>
+        <div class="detail-panel" style="height:calc(100% - 49px);overflow-y:auto;">
+
+          <!-- Basic -->
+          <div class="detail-section">
+            <div style="margin-bottom:12px;">
+              <div class="form-label">Field Label</div>
+              <input class="form-input" value="Price" />
+            </div>
+            <div class="form-row">
+              <div>
+                <div class="form-label">Field Type</div>
+                <select class="form-select">
+                  <option selected>Currency</option>
+                  <option>Number</option>
+                  <option>Percentage</option>
+                  <option>Formula</option>
+                </select>
+              </div>
+              <div>
+                <div class="form-label">Currency</div>
+                <select class="form-select">
+                  <option selected>USD — US Dollar</option>
+                  <option>EUR — Euro</option>
+                  <option>GBP — British Pound</option>
+                  <option>INR — Indian Rupee</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toggles -->
+          <div class="detail-section">
+            <div class="toggle-row" style="margin-bottom:12px;">
+              <div>
+                <div class="toggle-label">Required</div>
+                <div class="toggle-desc">Records must have a value in this field</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row" style="margin-bottom:12px;">
+              <div>
+                <div class="toggle-label">Allow negative values</div>
+                <div class="toggle-desc">Permit values below zero</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Show on public page</div>
+                <div class="toggle-desc">Visible when record is shared publicly</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Number formatting -->
+          <div class="detail-section">
+            <div class="form-row" style="margin-bottom:12px;">
+              <div>
+                <div class="form-label">Decimal places</div>
+                <input class="form-input" value="2" type="number" min="0" max="6"/>
+              </div>
+              <div>
+                <div class="form-label">Default value</div>
+                <input class="form-input" placeholder="None" />
+              </div>
+            </div>
+            <div>
+              <div class="form-label">Validation range</div>
+              <div class="form-row">
+                <input class="form-input" placeholder="Min value" type="number" />
+                <input class="form-input" placeholder="Max value" type="number" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Help text -->
+          <div class="detail-section">
+            <div class="form-label">Help text</div>
+            <input class="form-input" value="Selling price including all taxes" />
+            <div style="font-size:11px;color:var(--muted);margin-top:5px;">Displayed to users below the field when filling a form</div>
+          </div>
+
+          <!-- Permissions -->
+          <div class="detail-section">
+            <div class="form-label" style="margin-bottom:8px;">Permissions</div>
+            <div class="perm-row" style="margin-bottom:6px;">
+              <svg class="perm-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>All roles can <strong>view</strong> this field</span>
+              <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:11px;">Change</button>
+            </div>
+            <div class="perm-row">
+              <svg class="perm-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              <span><strong>Editor+</strong> can edit this field</span>
+              <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:11px;">Change</button>
+            </div>
+          </div>
+
+          <!-- Field ID -->
+          <div class="detail-section">
+            <div class="form-label" style="margin-bottom:6px;">Stable field ID</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="field-id">field_01HXPR72MK</div>
+              <button class="btn btn-ghost" style="padding:4px 9px;font-size:11.5px;" title="Copy">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Use this ID in formulas, automations, and the API</div>
+          </div>
+
+          <!-- Actions -->
+          <div class="detail-section" style="display:flex;gap:8px;background:var(--page);padding:16px 18px;border-top:1px solid var(--line);">
+            <button class="btn btn-brand" style="flex:1;justify-content:center;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Save changes
+            </button>
+            <button class="btn btn-outline" style="flex:1;justify-content:center;">
+              Cancel
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Other tabs (hidden placeholders) -->
+  <div id="tab-fields" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">🗃️</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Fields View</div>
+    <div style="font-size:13px;margin-top:4px;">Manage all 14 fields in spreadsheet view</div>
+  </div>
+  <div id="tab-statuses" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">🔄</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Status Workflows</div>
+    <div style="font-size:13px;margin-top:4px;">Configure status transitions and automation triggers</div>
+  </div>
+  <div id="tab-views" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">👁️</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Views</div>
+    <div style="font-size:13px;margin-top:4px;">3 views configured: Grid, Gallery, Kanban</div>
+  </div>
+  <div id="tab-forms" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">📋</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Forms</div>
+    <div style="font-size:13px;margin-top:4px;">2 public forms: New Product · Stock Update</div>
+  </div>
+  <div id="tab-qr-rules" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">📱</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">QR Rules</div>
+    <div style="font-size:13px;margin-top:4px;">Configure QR code generation rules and templates</div>
+  </div>
+  <div id="tab-functions" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">⚡</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Functions</div>
+    <div style="font-size:13px;margin-top:4px;">Custom server-side functions for this system</div>
+  </div>
+  <div id="tab-automations" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">🤖</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Automations</div>
+    <div style="font-size:13px;margin-top:4px;">2 active automations: Low Stock Alert · Reorder Notification</div>
+  </div>
+  <div id="tab-permissions" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">🔐</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">Permissions</div>
+    <div style="font-size:13px;margin-top:4px;">Role-based access control for this system</div>
+  </div>
+  <div id="tab-settings" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+    <div style="font-size:32px;margin-bottom:12px;">⚙️</div>
+    <div style="font-size:15px;font-weight:600;color:var(--ink);">System Settings</div>
+    <div style="font-size:13px;margin-top:4px;">Configure system name, icon, access, and danger zone</div>
+  </div>
+
+</div><!-- end main-wrap -->
+
+
+<!-- Delete Modal (visible by default) -->
+<div class="modal-overlay" id="delete-modal" onclick="closeModalOnBackdrop(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B43B47" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+      <div class="modal-title">Delete 'MRP' field?</div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:4px;">
+        This field is currently used across your system. Deleting it will affect the following:
+      </div>
+
+      <div class="impact-list">
+        <div class="impact-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>2</span> views use this field
+        </div>
+        <div class="impact-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>1</span> form includes this field
+        </div>
+        <div class="impact-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span>1</span> automation rule references this field
+        </div>
+        <div class="impact-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          <span>156</span> field values stored across records
+        </div>
+      </div>
+
+      <div class="warn-box">
+        <div class="warn-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+            <path d="M12 9v4M12 17h.01"/>
+          </svg>
+        </div>
+        <div class="warn-text">
+          <strong>Field values will be permanently deleted.</strong> This action cannot be undone. All 156 stored values for 'MRP' will be lost.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">
+        Cancel
+      </button>
+      <button class="btn btn-danger" onclick="closeModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6"/>
+        </svg>
+        Delete field
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Tab switching
+  const tabIds = {
+    'schema': 'tab-schema',
+    'fields': 'tab-fields',
+    'statuses': 'tab-statuses',
+    'views': 'tab-views',
+    'forms': 'tab-forms',
+    'qr-rules': 'tab-qr-rules',
+    'functions': 'tab-functions',
+    'automations': 'tab-automations',
+    'permissions': 'tab-permissions',
+    'settings': 'tab-settings',
+  };
+
+  function switchTab(el, id) {
+    // Remove active from all tabs
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    // Hide all tab content
+    Object.values(tabIds).forEach(tid => {
+      const el = document.getElementById(tid);
+      if (el) el.style.display = 'none';
+    });
+    // Show selected
+    const target = document.getElementById(tabIds[id]);
+    if (target) {
+      target.style.display = id === 'schema' ? '' : 'block';
+    }
+  }
+
+  // Field row selection & dynamic right-panel binding
+  function selectField(el, panelId) {
+    document.querySelectorAll('.field-row').forEach(r => r.classList.remove('active'));
+    el.classList.add('active');
+
+    const nameEl = el.querySelector('.field-name');
+    const typeEl = el.querySelector('.field-type');
+    const fieldName = nameEl ? nameEl.textContent.trim().split('\n')[0].trim() : 'Field';
+    const fieldType = typeEl ? typeEl.textContent.trim() : 'Custom';
+
+    // Update editor header and inputs
+    const labelInput = document.getElementById('field-label-input') || document.querySelector('input[value="Price"]');
+    if (labelInput) {
+      labelInput.id = 'field-label-input';
+      labelInput.value = fieldName;
+    }
+
+    const editorTitle = document.getElementById('editor-panel-title');
+    if (editorTitle) {
+      editorTitle.textContent = 'Edit Field: ' + fieldName;
+    }
+
+    const fieldIdEl = document.querySelector('.field-id');
+    if (fieldIdEl) {
+      const cleanSlug = fieldName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      fieldIdEl.textContent = 'field_' + cleanSlug + '_' + el.id.replace('fr-', '');
+    }
+
+    showToast('Loaded settings for field: ' + fieldName);
+  }
+
+  // Type dropdown
+  let dropdownOpen = false;
+  function toggleTypeDropdown() {
+    dropdownOpen = !dropdownOpen;
+    const dd = document.getElementById('type-dropdown');
+    dd.style.display = dropdownOpen ? 'block' : 'none';
+    event.stopPropagation();
+  }
+
+  document.addEventListener('click', function(e) {
+    if (dropdownOpen && !e.target.closest('#type-dropdown') && !e.target.closest('.add-field-row')) {
+      dropdownOpen = false;
+      document.getElementById('type-dropdown').style.display = 'none';
+    }
+  });
+
+  // Modal
+  function openDeleteModal(e) {
+    e.stopPropagation();
+    document.getElementById('delete-modal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('delete-modal').style.display = 'none';
+  }
+
+  function closeModalOnBackdrop(e) {
+    if (e.target === document.getElementById('delete-modal')) {
+      closeModal();
+    }
+  }
+
+  // Keyboard ESC
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeModal();
+      dropdownOpen = false;
+      document.getElementById('type-dropdown').style.display = 'none';
+    }
+  });
+</script>
+
+
+<script>
+  function showToast(msg, isSuccess = true) {
+    let toast = document.getElementById('app-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'app-toast';
+      toast.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:999;background:#17161D;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 10px 30px rgba(0,0,0,0.25);display:flex;align-items:center;gap:10px;transition:all 0.3s cubic-bezier(0.22,1,0.36,1);transform:translateY(20px);opacity:0;pointer-events:none;';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = (isSuccess ? '<span style="color:#10b981;font-size:16px;">✓</span> ' : '<span style="color:#ef4444;font-size:16px;">✕</span> ') + msg;
+    toast.style.transform = 'translateY(0)';
+    toast.style.opacity = '1';
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => {
+      toast.style.transform = 'translateY(20px)';
+      toast.style.opacity = '0';
+    }, 3200);
+  }
+
+  function saveFieldChanges() {
+    const label = document.querySelector('input[value="Price"]')?.value || 'Price';
+    showToast('Field "' + label + '" settings saved successfully!');
+  }
+
+  document.querySelectorAll('.type-item').forEach(item => {
+    item.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const typeName = this.querySelector('div div:first-child')?.textContent || 'New Field';
+      showToast('Added custom field: ' + typeName);
+      dropdownOpen = false;
+      document.getElementById('type-dropdown').style.display = 'none';
+    });
+  });
+</script>
+
+</body>
+</html>

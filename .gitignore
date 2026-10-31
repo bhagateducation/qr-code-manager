@@ -1,0 +1,6 @@
+# Logs and temporary files
+*.log
+.vscode/
+
+# Node
+node_modules/
