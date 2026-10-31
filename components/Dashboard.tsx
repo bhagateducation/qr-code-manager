@@ -106,6 +106,7 @@ type Data = {
   integrations: { id: string; provider: string; name: string; status: string; createdAt: string }[];
   webhooks: { id: string; url: string; events: unknown; isActive: boolean; createdAt: string }[];
   apiKeys: { id: string; label: string; prefix: string; lastUsedAt: string | null; revokedAt: string | null; createdAt: string }[];
+  webhookDeliveries: { id: string; eventType: string; status: string; responseCode: number | null; attempts: number; lastError: string | null; createdAt: string; deliveredAt: string | null; webhook: { url: string } }[];
 };
 export async function api(path: string, data?: unknown) {
   const response = await fetch(path, {

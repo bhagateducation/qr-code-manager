@@ -92,7 +92,7 @@ export async function GET(
       ]);
       const webhooks = await prisma.webhook.findMany({
         where: { workspaceId: qr.workspaceId, isActive: true },
-        select: { url: true, secret: true, events: true },
+        select: { id: true, url: true, secret: true, events: true },
       });
       const event = {
         id: randomUUID(),
@@ -113,17 +113,23 @@ export async function GET(
             if (!endpoint.success) return;
             const payload = JSON.stringify(event);
             const signature = createHmac("sha256", hook.secret).update(payload).digest("hex");
-            await fetch(endpoint.data, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "User-Agent": "QR-Manager-Webhook/1.0",
-                "X-QR-Manager-Event": event.type,
-                "X-QR-Manager-Signature": `sha256=${signature}`,
-              },
-              body: payload,
-              signal: AbortSignal.timeout(1500),
-            });
+            const delivery = await prisma.webhookDelivery.create({ data: { webhookId: hook.id, eventType: event.type, payload, attempts: 1 } });
+            try {
+              const response = await fetch(endpoint.data, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "User-Agent": "QR-Manager-Webhook/1.0",
+                  "X-QR-Manager-Event": event.type,
+                  "X-QR-Manager-Signature": `sha256=${signature}`,
+                },
+                body: payload,
+                signal: AbortSignal.timeout(1500),
+              });
+              await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: response.ok ? "delivered" : "failed", responseCode: response.status, deliveredAt: response.ok ? new Date() : null, lastError: response.ok ? null : `HTTP ${response.status}` } });
+            } catch (error) {
+              await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: "failed", lastError: error instanceof Error ? error.message.slice(0, 180) : "Delivery failed" } });
+            }
           }),
       );
     }

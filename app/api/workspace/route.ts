@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       integrations,
       webhooks,
       apiKeys,
+      webhookDeliveries,
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
@@ -113,6 +114,7 @@ export async function GET(request: NextRequest) {
       prisma.integration.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
       prisma.webhook.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, url: true, events: true, isActive: true, createdAt: true } }),
       prisma.apiKey.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, label: true, prefix: true, lastUsedAt: true, revokedAt: true, createdAt: true } }),
+      prisma.webhookDelivery.findMany({ where: { webhook: { workspaceId } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, eventType: true, status: true, responseCode: true, attempts: true, lastError: true, createdAt: true, deliveredAt: true, webhook: { select: { url: true } } } }),
     ]);
     const plan = effectivePlan(user.workspace);
     const prices = {
@@ -148,6 +150,7 @@ export async function GET(request: NextRequest) {
       integrations,
       webhooks,
       apiKeys,
+      webhookDeliveries,
       limits: limits[plan],
       prices,
       checkoutReady: !!(

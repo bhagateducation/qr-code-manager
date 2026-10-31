@@ -159,9 +159,28 @@ model Webhook {
   createdAt   DateTime   @default(now())
 
   workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
 
   @@index([workspaceId])
   @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id          String   @id @default(uuid())
+  webhookId   String
+  eventType   String
+  payload     Json
+  status      String   @default("pending")
+  responseCode Int?
+  attempts    Int      @default(0)
+  lastError   String?
+  deliveredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  @@index([webhookId, createdAt])
+  @@index([status, createdAt])
+  @@map("webhook_deliveries")
 }
 
 model Tag {

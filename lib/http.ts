@@ -76,6 +76,19 @@ export async function authorize(write = false) {
     throw new ApiError(403, "You do not have permission to make this change.");
   return user;
 }
+export async function authorizeApiKey(request: NextRequest) {
+  const header = request.headers.get("x-api-key") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!header || !/^qrm_live_[A-Za-z0-9_-]{20,}$/.test(header))
+    throw new ApiError(401, "A valid API key is required.");
+  const key = await prisma.apiKey.findUnique({
+    where: { tokenHash: digest(header) },
+    include: { workspace: true },
+  });
+  if (!key || key.revokedAt || key.workspace.suspended)
+    throw new ApiError(401, "A valid API key is required.");
+  await prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
+  return key;
+}
 export async function rateLimit(key: string, maximum: number, seconds = 900) {
   const window = Math.floor(Date.now() / (seconds * 1000));
   const row = await prisma.rateLimit.upsert({
