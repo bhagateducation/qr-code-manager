@@ -716,6 +716,58 @@ tbody tr:last-child td {
 .feature-roadmap {
   max-width: 760px;
 }
+.feature-list {
+  display: grid;
+  gap: 10px;
+}
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+.feature-row > div {
+  min-width: 0;
+  flex: 1;
+}
+.feature-row strong,
+.feature-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feature-row strong {
+  font-size: 12px;
+}
+.feature-row select {
+  width: auto;
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.tag-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+.secret-value {
+  display: inline-block;
+  max-width: min(100%, 560px);
+  margin: 8px 12px;
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: #f5f2ff;
+  color: var(--brand);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
 .feature-roadmap h2 {
   margin-top: 16px;
 }

@@ -35,6 +35,7 @@ import {
 import QRStudio from "./QRStudio";
 import Systems from "./Systems";
 import PasswordSettings from "./PasswordSettings";
+import FeaturePanel from "./FeaturePanel";
 
 export type QR = {
   id: string;
@@ -96,6 +97,12 @@ type Data = {
     createdAt: string;
   }[];
   members: { id: string; name: string; email: string; role: string }[];
+  tags: { id: string; name: string; color: string; createdAt: string }[];
+  automations: { id: string; name: string; kind: string; config: unknown; isActive: boolean; createdAt: string }[];
+  campaigns: { id: string; name: string; description: string | null; status: string; createdAt: string }[];
+  integrations: { id: string; provider: string; name: string; status: string; createdAt: string }[];
+  webhooks: { id: string; url: string; events: unknown; isActive: boolean; createdAt: string }[];
+  apiKeys: { id: string; label: string; prefix: string; lastUsedAt: string | null; revokedAt: string | null; createdAt: string }[];
 };
 export async function api(path: string, data?: unknown) {
   const response = await fetch(path, {
@@ -132,13 +139,14 @@ const navigation = [
   { id: "systems", label: "Systems", icon: Layers, group: "Main" },
   { id: "records", label: "Records", icon: List, group: "Main" },
   { id: "codes", label: "QR codes", icon: QrCode, group: "Main" },
-  { id: "tags", label: "Tags", icon: Tag, group: "Main", planned: true },
-  { id: "functions", label: "Functions", icon: Zap, group: "Main", planned: true },
-  { id: "workflows", label: "Workflows", icon: GitBranch, group: "Main", planned: true },
-  { id: "campaigns", label: "Campaigns", icon: Megaphone, group: "Main", planned: true },
+  { id: "tags", label: "Tags", icon: Tag, group: "Main" },
+  { id: "functions", label: "Functions", icon: Zap, group: "Main" },
+  { id: "workflows", label: "Workflows", icon: GitBranch, group: "Main" },
+  { id: "campaigns", label: "Campaigns", icon: Megaphone, group: "Main" },
   { id: "analytics", label: "Analytics", icon: BarChart3, group: "Main" },
-  { id: "integrations", label: "Integrations", icon: Puzzle, group: "Connect", planned: true },
-  { id: "webhooks", label: "API & Webhooks", icon: Code2, group: "Connect", planned: true },
+  { id: "integrations", label: "Integrations", icon: Puzzle, group: "Connect" },
+  { id: "webhooks", label: "API & Webhooks", icon: Code2, group: "Connect" },
+  { id: "apiKeys", label: "API keys", icon: ShieldCheck, group: "Connect" },
   { id: "team", label: "Team & roles", icon: Users, group: "Manage" },
   { id: "billing", label: "Billing", icon: CreditCard, group: "Manage" },
   { id: "activity", label: "Audit log", icon: Activity, group: "Manage" },
@@ -183,6 +191,7 @@ const plannedFeatures: Record<string, { title: string; description: string; scop
     scope: "Product documentation, onboarding checklist and support requests.",
   },
 };
+const managedFeatures = new Set(["tags", "functions", "workflows", "campaigns", "integrations", "webhooks", "apiKeys"]);
 
 export default function Dashboard() {
   const [data, setData] = useState<Data | null>(null),
@@ -809,7 +818,17 @@ export default function Dashboard() {
               </div>
             )}
             {tab === "platform" && data.user.platformAdmin && <Platform />}
-            {plannedFeatures[tab] && <PlannedFeature feature={plannedFeatures[tab]} />}
+            {managedFeatures.has(tab) && (
+              <FeaturePanel
+                feature={tab as "tags" | "functions" | "workflows" | "campaigns" | "integrations" | "webhooks" | "apiKeys"}
+                data={data}
+                canWrite={canWrite}
+                mutate={mutate}
+              />
+            )}
+            {plannedFeatures[tab] && !managedFeatures.has(tab) && (
+              <PlannedFeature feature={plannedFeatures[tab]} />
+            )}
           </div>
           <footer className="panel-footer">
             QR Manager <span>One workspace. Every connection.</span>

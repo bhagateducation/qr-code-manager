@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import {
   authorize,
@@ -48,6 +48,12 @@ export async function GET(request: NextRequest) {
       audit,
       payments,
       members,
+      tags,
+      automations,
+      campaigns,
+      integrations,
+      webhooks,
+      apiKeys,
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
@@ -99,6 +105,12 @@ export async function GET(request: NextRequest) {
         select: { id: true, name: true, email: true, role: true },
         take: 100,
       }),
+      prisma.tag.findMany({ where: { workspaceId }, orderBy: { name: "asc" } }),
+      prisma.automation.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.campaign.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.integration.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.webhook.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, url: true, events: true, isActive: true, createdAt: true } }),
+      prisma.apiKey.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, label: true, prefix: true, lastUsedAt: true, revokedAt: true, createdAt: true } }),
     ]);
     const plan = effectivePlan(user.workspace);
     const prices = {
@@ -128,6 +140,12 @@ export async function GET(request: NextRequest) {
       audit,
       payments,
       members,
+      tags,
+      automations,
+      campaigns,
+      integrations,
+      webhooks,
+      apiKeys,
       limits: limits[plan],
       prices,
       checkoutReady: !!(
@@ -154,6 +172,7 @@ export async function POST(request: NextRequest) {
       .parse(await body(request));
     await rateLimit(`write:${user.id}`, 120, 60);
     const workspaceId = user.workspaceId;
+    let oneTimeSecret: string | undefined;
     const result = await prisma.$transaction(async (tx) => {
       // A workspace row lock serializes quota checks and creates in every instance.
       const workspace = await tx.workspace.update({
@@ -281,6 +300,74 @@ export async function POST(request: NextRequest) {
             data: { title: data.title, data: values },
           });
         }
+      } else if (input.action === "tag.create") {
+        const data = z
+          .object({ name: name, color: z.string().regex(/^#[0-9a-f]{6}$/i).default("#5B43D6") })
+          .parse(input.data);
+        entity = await tx.tag.create({ data: { ...data, workspaceId } });
+      } else if (input.action === "tag.delete") {
+        if (!input.id) throw new ApiError(400, "Tag is required.");
+        entity = await tx.tag.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Tag not found.");
+      } else if (input.action === "automation.create") {
+        const data = z
+          .object({ name, kind: z.enum(["function", "workflow"]), config: z.unknown().optional() })
+          .parse(input.data);
+        entity = await tx.automation.create({ data: { ...data, config: data.config as any, workspaceId } });
+      } else if (input.action === "automation.toggle") {
+        if (!input.id) throw new ApiError(400, "Automation is required.");
+        const automation = await tx.automation.findFirst({ where: { id: input.id, workspaceId } });
+        if (!automation) throw new ApiError(404, "Automation not found.");
+        entity = await tx.automation.update({ where: { id: automation.id }, data: { isActive: !automation.isActive } });
+      } else if (input.action === "automation.delete") {
+        if (!input.id) throw new ApiError(400, "Automation is required.");
+        entity = await tx.automation.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Automation not found.");
+      } else if (input.action === "campaign.create") {
+        const data = z.object({ name, description: z.string().max(500).optional(), status: z.enum(["draft", "active", "paused"]).default("draft") }).parse(input.data);
+        entity = await tx.campaign.create({ data: { ...data, workspaceId } });
+      } else if (input.action === "campaign.status") {
+        if (!input.id) throw new ApiError(400, "Campaign is required.");
+        const data = z.object({ status: z.enum(["draft", "active", "paused", "completed"]) }).parse(input.data);
+        entity = await tx.campaign.updateMany({ where: { id: input.id, workspaceId }, data }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Campaign not found.");
+      } else if (input.action === "campaign.delete") {
+        if (!input.id) throw new ApiError(400, "Campaign is required.");
+        entity = await tx.campaign.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Campaign not found.");
+      } else if (input.action === "integration.create") {
+        const data = z.object({ provider: name, name, config: z.unknown().optional() }).parse(input.data);
+        entity = await tx.integration.create({ data: { ...data, config: data.config as any, workspaceId } });
+      } else if (input.action === "integration.toggle") {
+        if (!input.id) throw new ApiError(400, "Integration is required.");
+        const integration = await tx.integration.findFirst({ where: { id: input.id, workspaceId } });
+        if (!integration) throw new ApiError(404, "Integration not found.");
+        entity = await tx.integration.update({ where: { id: integration.id }, data: { status: integration.status === "active" ? "paused" : "active" } });
+      } else if (input.action === "integration.delete") {
+        if (!input.id) throw new ApiError(400, "Integration is required.");
+        entity = await tx.integration.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Integration not found.");
+      } else if (input.action === "webhook.create") {
+        const data = z.object({ url: z.string().url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "HTTPS URL required"), events: z.array(z.string().min(1).max(80)).min(1).max(20) }).parse(input.data);
+        oneTimeSecret = `whsec_${randomBytes(24).toString("base64url")}`;
+        entity = await tx.webhook.create({ data: { ...data, workspaceId, secret: oneTimeSecret } });
+      } else if (input.action === "webhook.toggle") {
+        if (!input.id) throw new ApiError(400, "Webhook is required.");
+        const webhook = await tx.webhook.findFirst({ where: { id: input.id, workspaceId } });
+        if (!webhook) throw new ApiError(404, "Webhook not found.");
+        entity = await tx.webhook.update({ where: { id: webhook.id }, data: { isActive: !webhook.isActive } });
+      } else if (input.action === "webhook.delete") {
+        if (!input.id) throw new ApiError(400, "Webhook is required.");
+        entity = await tx.webhook.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Webhook not found.");
+      } else if (input.action === "apiKey.create") {
+        const data = z.object({ label: name }).parse(input.data);
+        oneTimeSecret = `qrm_live_${randomBytes(24).toString("base64url")}`;
+        entity = await tx.apiKey.create({ data: { ...data, workspaceId, prefix: oneTimeSecret.slice(0, 18), tokenHash: createHash("sha256").update(oneTimeSecret).digest("hex") } });
+      } else if (input.action === "apiKey.revoke") {
+        if (!input.id) throw new ApiError(400, "API key is required.");
+        entity = await tx.apiKey.updateMany({ where: { id: input.id, workspaceId, revokedAt: null }, data: { revokedAt: new Date() } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "API key not found.");
       } else if (input.action === "workspace.rename") {
         if (user.role !== "owner")
           throw new ApiError(
@@ -302,7 +389,7 @@ export async function POST(request: NextRequest) {
       });
       return entity;
     });
-    return json({ ok: true, entity: result });
+    return json({ ok: true, entity: result, oneTimeSecret });
   } catch (error) {
     return failure(error);
   }

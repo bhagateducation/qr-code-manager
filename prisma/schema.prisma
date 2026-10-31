@@ -21,6 +21,11 @@ model Workspace {
   systems     System[]
   qrCodes     QRCode[]
   webhooks    Webhook[]
+  tags        Tag[]
+  automations Automation[]
+  campaigns   Campaign[]
+  integrations Integration[]
+  apiKeys     ApiKey[]
   payments    Payment[]
   audits      AuditLog[]
 
@@ -153,6 +158,74 @@ model Webhook {
 
   @@index([workspaceId])
   @@map("webhooks")
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  color       String   @default("#5B43D6")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("tags")
+}
+
+model Automation {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name       String
+  kind       String   @default("workflow")
+  config     Json?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, kind])
+  @@map("automations")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, status])
+  @@map("campaigns")
+}
+
+model Integration {
+  id          String   @id @default(uuid())
+  workspaceId String
+  provider    String
+  name        String
+  config      Json?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, provider])
+  @@map("integrations")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  workspaceId String
+  label       String
+  prefix      String
+  tokenHash   String    @unique
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, revokedAt])
+  @@map("api_keys")
 }
 
 model Session {
