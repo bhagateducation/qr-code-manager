@@ -14,6 +14,8 @@ import {
   revokeSession,
 } from "@/lib/auth";
 import { verifyTotp } from "@/lib/mfa";
+import { emailDeliveryConfigured, sendEmailVerificationEmail } from "@/lib/email";
+import { createHash } from "node:crypto";
 
 export async function POST(
   request: NextRequest,
@@ -42,11 +44,14 @@ export async function POST(
         .object({ email, password, name, workspace: name })
         .parse(input);
       const passwordHash = await hashPassword(data.password);
+      const verificationToken = `verify_${randomBytes(32).toString("base64url")}`;
       user = await prisma.user.create({
         data: {
           name: data.name,
           email: data.email,
           passwordHash,
+          emailVerificationTokenHash: createHash("sha256").update(verificationToken).digest("hex"),
+          emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           role: "owner",
           workspace: {
             create: {
@@ -56,6 +61,10 @@ export async function POST(
           },
         },
       });
+      await sendEmailVerificationEmail(
+        user.email,
+        `${process.env.APP_URL}/verify-email?token=${encodeURIComponent(verificationToken)}`,
+      );
     } else {
       user = await prisma.user.findUnique({
         where: { email: credentials.email },
@@ -70,14 +79,25 @@ export async function POST(
       );
       if (!user || !valid || user.workspace.suspended)
         throw new ApiError(401, "Invalid email or password.");
+      if (process.env.REQUIRE_EMAIL_VERIFICATION === "true" && emailDeliveryConfigured() && !user.emailVerifiedAt)
+        throw new ApiError(403, "Verify your email address before signing in.");
       if (user.mfaEnabled) {
         if (!credentials.mfaCode) return json({ mfaRequired: true });
         if (!user.mfaSecret || !verifyTotp(user.mfaSecret, credentials.mfaCode))
           throw new ApiError(401, "Invalid authenticator code.");
       }
     }
+    const verificationRequired =
+      action === "register" &&
+      process.env.REQUIRE_EMAIL_VERIFICATION === "true" &&
+      emailDeliveryConfigured();
+    if (verificationRequired)
+      return json({ ok: true, emailVerificationRequired: true });
     const token = await createSession(user.id);
-    const response = json({ ok: true });
+    const response = json({
+      ok: true,
+      emailVerificationRequired: false,
+    });
     response.cookies.set(COOKIE_NAME, token, {
       ...cookieOptions,
       maxAge: SESSION_SECONDS,

@@ -4,12 +4,14 @@ import { useState } from "react";
 import { QrCode, ArrowRight, Eye, EyeOff } from "lucide-react";
 export default function AuthForm({ register = false }: { register?: boolean }) {
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setMessage("");
     setBusy(true);
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
@@ -25,6 +27,11 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
       if (!response.ok) throw new Error(result.error);
       if (result.mfaRequired) {
         setMfaRequired(true);
+        setBusy(false);
+        return;
+      }
+      if (result.emailVerificationRequired) {
+        setMessage("Account created. Check your email to verify the workspace before signing in.");
         setBusy(false);
         return;
       }
@@ -110,6 +117,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
               {error}
             </p>
           )}
+          {message && <p role="status" className="notice">{message}</p>}
           <button disabled={busy} className="button primary">
             {busy
               ? "Please wait…"

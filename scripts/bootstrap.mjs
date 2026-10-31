@@ -16,6 +16,7 @@ try {
     await prisma.user.create({
       data: {
         email,
+        emailVerifiedAt: new Date(),
         name: "Rahul Bhagat",
         role: "owner",
         platformAdmin: true,
@@ -51,6 +52,11 @@ try {
           },
         },
       },
+    });
+  } else if (!existing.emailVerifiedAt) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { emailVerifiedAt: new Date() },
     });
   }
   await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });

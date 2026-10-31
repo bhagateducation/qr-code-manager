@@ -19,7 +19,7 @@ The temporary Hostinger origin is confirmed live; attach the final custom domain
 2. Back up the current static files. User confirmed the existing data is disposable, but use a separate database for the new schema to make rollback independent.
 3. Create a new MySQL database/user scoped to this application. Store a generated unique password privately. Do not reuse or publish the old repository's secrets.
 4. Set the full environment set from `.env.example` in hosting. `DATABASE_URL` must use `127.0.0.1:3306` inside Hostinger, not the public remote DB hostname. Set `APP_URL` to the exact HTTPS origin above.
-5. Password recovery is available at `/forgot-password` and `/reset-password`. To deliver reset links, configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL` as private Hostinger environment variables. Without them, the app still returns a privacy-safe generic response, but no email is delivered.
+5. Password recovery is available at `/forgot-password` and `/reset-password`; email verification is available at `/verify-email`. Configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL` as private Hostinger environment variables to deliver both email types. Set `REQUIRE_EMAIL_VERIFICATION=true` only after delivery is verified. Without the provider, the app keeps a privacy-safe generic response but no email is delivered.
 6. Prices are paise: Pro `49900`, Business `149900`. Without valid payment keys/webhook secret, checkout is unavailable and free usage works.
 7. Configure Node 22 or 24. Local tests used Node 26; the deployed Hostinger build has passed its production build step.
 

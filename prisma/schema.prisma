@@ -45,6 +45,8 @@ model User {
   mfaSecret    String?
   backupCodes  Json?
   emailVerifiedAt DateTime?
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
   createdAt    DateTime   @default(now())
@@ -54,6 +56,8 @@ model User {
   sessions     Session[]
 
   @@index([workspaceId])
+  @@unique([emailVerificationTokenHash])
+  @@unique([passwordResetTokenHash])
   @@map("users")
 }
 
