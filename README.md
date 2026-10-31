@@ -30,4 +30,4 @@ Do not point the integration suite at production. Local tests used SQLite with t
 
 `app/api/auth` and `lib/auth.ts`: credential verification and revocable sessions. `app/api/workspace`: scoped QR/system/record writes with quota enforcement. `app/s/[code]`: public resolver and scan events. `app/api/billing`: Razorpay order/signature/captured-payment handling. `app/api/platform`: owner workspace controls. `components/Dashboard.tsx`, `QRStudio.tsx`, `Systems.tsx`: unified working panel. `prisma/migrations`: initial MySQL schema.
 
-Paid plans are Pro ₹499 and Business ₹1,499 for 30 days with manual renewal. Razorpay must be configured and tested before activation. Password recovery, email verification and MFA are implemented; provider configuration, legal pages and operational launch gates remain documented in the audit.
+Paid plans are Pro ₹499 and Business ₹1,499 for 30 days with manual renewal. Razorpay must be configured and tested before activation. Password recovery, email verification, MFA and native Wi-Fi/vCard/plain-text QR payloads are implemented; provider configuration, legal pages and operational launch gates remain documented in the audit.
