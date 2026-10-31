@@ -41,6 +41,9 @@ model User {
   passwordHash String
   role         String     @default("owner") // workspace role, not platform administrator
   platformAdmin Boolean   @default(false)
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?
+  backupCodes  Json?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

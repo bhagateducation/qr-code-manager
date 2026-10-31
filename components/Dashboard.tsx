@@ -37,6 +37,7 @@ import Systems from "./Systems";
 import PasswordSettings from "./PasswordSettings";
 import FeaturePanel from "./FeaturePanel";
 import TeamPanel from "./TeamPanel";
+import MfaSettings from "./MfaSettings";
 
 export type QR = {
   id: string;
@@ -809,6 +810,7 @@ export default function Dashboard() {
                 <PasswordSettings />
               </div>
             )}
+            {tab === "settings" && <MfaSettings />}
             {tab === "platform" && data.user.platformAdmin && <Platform />}
             {managedFeatures.has(tab) && (
               <FeaturePanel

@@ -6,6 +6,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -22,6 +23,11 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
+      if (result.mfaRequired) {
+        setMfaRequired(true);
+        setBusy(false);
+        return;
+      }
       window.location.assign("/dashboard");
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to sign in.");
@@ -91,6 +97,13 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
             </div>
             {register && <small>Use at least 12 characters.</small>}
           </label>
+          {mfaRequired && (
+            <label>
+              Authenticator code
+              <input name="mfaCode" inputMode="numeric" pattern="[0-9]{6}" minLength={6} maxLength={6} required autoComplete="one-time-code" placeholder="000000" />
+              <small>Enter the six-digit code from your authenticator app.</small>
+            </label>
+          )}
           {error && (
             <p role="alert" className="notice error">
               {error}
@@ -101,7 +114,9 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
               ? "Please wait…"
               : register
                 ? "Create free account"
-                : "Sign in"}
+                : mfaRequired
+                  ? "Verify and sign in"
+                  : "Sign in"}
             <ArrowRight size={17} />
           </button>
         </form>
