@@ -304,6 +304,10 @@ export default function Dashboard() {
             <Download size={15} />
             Export page
           </button>
+          <a className="button small" href="/api/workspace/export?kind=qr">
+            <Download size={15} />
+            Export all
+          </a>
           <form
             className="search"
             onSubmit={(e) => {
@@ -747,6 +751,10 @@ export default function Dashboard() {
                     <Download size={17} />
                     Export shown scans
                   </button>
+                  <a className="button small" href="/api/workspace/export?kind=scans">
+                    <Download size={15} />
+                    Export all scans
+                  </a>
                 </div>
                 <div className="table-scroll">
                   <table>
