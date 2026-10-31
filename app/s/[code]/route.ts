@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { destination } from "@/lib/validation";
 export const dynamic = "force-dynamic";
@@ -89,6 +90,42 @@ export async function GET(
           data: { scanCount: { increment: 1 } },
         }),
       ]);
+      const webhooks = await prisma.webhook.findMany({
+        where: { workspaceId: qr.workspaceId, isActive: true },
+        select: { url: true, secret: true, events: true },
+      });
+      const event = {
+        id: randomUUID(),
+        type: "scan.created",
+        createdAt: new Date().toISOString(),
+        data: {
+          qrCodeId: qr.id,
+          shortCode: qr.shortCode,
+          os,
+          targetUrl: target.data,
+        },
+      };
+      await Promise.allSettled(
+        webhooks
+          .filter((hook) => Array.isArray(hook.events) && (hook.events as unknown[]).map(String).includes("scan.created"))
+          .map(async (hook) => {
+            const endpoint = destination.safeParse(hook.url);
+            if (!endpoint.success) return;
+            const payload = JSON.stringify(event);
+            const signature = createHmac("sha256", hook.secret).update(payload).digest("hex");
+            await fetch(endpoint.data, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "User-Agent": "QR-Manager-Webhook/1.0",
+                "X-QR-Manager-Event": event.type,
+                "X-QR-Manager-Signature": `sha256=${signature}`,
+              },
+              body: payload,
+              signal: AbortSignal.timeout(1500),
+            });
+          }),
+      );
     }
     const response = NextResponse.redirect(target.data, 302);
     response.headers.set("Cache-Control", "no-store, max-age=0");

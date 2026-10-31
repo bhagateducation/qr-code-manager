@@ -12,12 +12,16 @@ export default function QRStudio({
   qr,
   appUrl,
   canWrite,
+  tags,
+  campaigns,
   onSave,
   onClose,
 }: {
   qr: QR | null;
   appUrl: string;
   canWrite: boolean;
+  tags: { id: string; name: string; color: string }[];
+  campaigns: { id: string; name: string; status: string }[];
   onSave: (value: unknown, id?: string) => Promise<any>;
   onClose: () => void;
 }) {
@@ -26,6 +30,8 @@ export default function QRStudio({
     [target, setTarget] = useState(qr?.targetUrl || ""),
     [ios, setIos] = useState(qr?.routingRules?.ios || ""),
     [android, setAndroid] = useState(qr?.routingRules?.android || ""),
+    [campaignId, setCampaignId] = useState(qr?.campaignId || ""),
+    [tagIds, setTagIds] = useState<string[]>(qr?.tagIds || qr?.tags?.map((item) => item.tag.id) || []),
     [expiry, setExpiry] = useState(
       qr?.routingRules?.expiresAt?.slice(0, 16) || "",
     ),
@@ -94,6 +100,8 @@ export default function QRStudio({
         isActive: saved?.isActive ?? true,
         styling: style,
         recordId: saved?.recordId || null,
+        campaignId: campaignId || null,
+        tagIds,
         routingRules: {
           ...(ios ? { ios } : {}),
           ...(android ? { android } : {}),
@@ -203,6 +211,21 @@ export default function QRStudio({
                 {["L", "M", "Q", "H"].map((v) => (
                   <option key={v}>{v}</option>
                 ))}
+              </select>
+            </label>
+          </div>
+          <div className="form-grid">
+            <label>
+              Campaign (optional)
+              <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
+                <option value="">No campaign</option>
+                {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name} · {campaign.status}</option>)}
+              </select>
+            </label>
+            <label>
+              Tags (Ctrl/Cmd-click for multiple)
+              <select multiple value={tagIds} onChange={(e) => setTagIds(Array.from(e.target.selectedOptions, (option) => option.value))}>
+                {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
               </select>
             </label>
           </div>

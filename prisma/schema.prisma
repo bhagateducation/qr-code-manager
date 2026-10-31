@@ -106,6 +106,7 @@ model QRCode {
   id           String     @id @default(uuid())
   workspaceId  String
   recordId     String?
+  campaignId   String?
   shortCode    String     @unique // e.g. "acme-qr-928"
   title        String
   type         String     @default("dynamic_url") // dynamic_url, vcard, menu, wifi, product, etc.
@@ -119,10 +120,13 @@ model QRCode {
 
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   record       Record?    @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  campaign     Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   scanLogs     ScanLog[]
+  tags         QRCodeTag[]
 
   @@index([workspaceId])
   @@index([recordId])
+  @@index([campaignId])
   @@index([shortCode])
   @@map("qr_codes")
 }
@@ -168,6 +172,7 @@ model Tag {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  qrCodes     QRCodeTag[]
   @@unique([workspaceId, name])
   @@index([workspaceId])
   @@map("tags")
@@ -196,8 +201,19 @@ model Campaign {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  qrCodes     QRCode[]
   @@index([workspaceId, status])
   @@map("campaigns")
+}
+
+model QRCodeTag {
+  qrCodeId String
+  tagId    String
+  qrCode   QRCode @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([qrCodeId, tagId])
+  @@index([tagId])
+  @@map("qr_code_tags")
 }
 
 model Integration {

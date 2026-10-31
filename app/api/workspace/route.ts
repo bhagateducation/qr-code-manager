@@ -12,6 +12,7 @@ import {
 } from "@/lib/http";
 import {
   name,
+  destination,
   qrSchema,
   systemSchema,
   validateRecord,
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
+        include: { tags: { include: { tag: true } }, campaign: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * 25,
         take: 25,
@@ -185,6 +187,7 @@ export async function POST(request: NextRequest) {
       let entity: { id: string } | null = null;
       if (input.action === "qr.create" || input.action === "qr.update") {
         const data = qrSchema.parse(input.data);
+        const { tagIds, campaignId, ...qrData } = data;
         const app = new URL(process.env.APP_URL!);
         if (
           [
@@ -203,12 +206,22 @@ export async function POST(request: NextRequest) {
             "A QR cannot redirect to another QR resolver on this site.",
           );
         if (
-          data.recordId &&
+          qrData.recordId &&
           !(await tx.record.findFirst({
-            where: { id: data.recordId, system: { workspaceId } },
+            where: { id: qrData.recordId, system: { workspaceId } },
           }))
         )
           throw new ApiError(404, "Record not found.");
+        if (
+          campaignId &&
+          !(await tx.campaign.findFirst({ where: { id: campaignId, workspaceId } }))
+        )
+          throw new ApiError(404, "Campaign not found.");
+        const validTags = tagIds.length
+          ? await tx.tag.findMany({ where: { id: { in: tagIds }, workspaceId }, select: { id: true } })
+          : [];
+        if (validTags.length !== new Set(tagIds).size)
+          throw new ApiError(404, "One or more tags were not found.");
         if (input.action === "qr.create") {
           if (
             (await tx.qRCode.count({ where: { workspaceId } })) >= quota.codes
@@ -216,9 +229,11 @@ export async function POST(request: NextRequest) {
             throw new ApiError(409, "Your plan QR limit has been reached.");
           entity = await tx.qRCode.create({
             data: {
-              ...data,
+              ...qrData,
+              campaignId: campaignId || null,
               workspaceId,
               shortCode: randomBytes(9).toString("base64url"),
+              tags: { create: tagIds.map((tagId) => ({ tagId })) },
             },
           });
         } else {
@@ -229,7 +244,17 @@ export async function POST(request: NextRequest) {
             }))
           )
             throw new ApiError(404, "QR not found.");
-          entity = await tx.qRCode.update({ where: { id: input.id }, data });
+          entity = await tx.qRCode.update({
+            where: { id: input.id },
+            data: {
+              ...qrData,
+              campaignId: campaignId || null,
+              tags: {
+                deleteMany: {},
+                create: tagIds.map((tagId) => ({ tagId })),
+              },
+            },
+          });
         }
       } else if (input.action === "qr.pause") {
         if (!input.id) throw new ApiError(400, "QR is required.");
@@ -348,7 +373,7 @@ export async function POST(request: NextRequest) {
         entity = await tx.integration.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "Integration not found.");
       } else if (input.action === "webhook.create") {
-        const data = z.object({ url: z.string().url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "HTTPS URL required"), events: z.array(z.string().min(1).max(80)).min(1).max(20) }).parse(input.data);
+        const data = z.object({ url: destination, events: z.array(z.string().min(1).max(80)).min(1).max(20) }).parse(input.data);
         oneTimeSecret = `whsec_${randomBytes(24).toString("base64url")}`;
         entity = await tx.webhook.create({ data: { ...data, workspaceId, secret: oneTimeSecret } });
       } else if (input.action === "webhook.toggle") {

@@ -47,6 +47,9 @@ export type QR = {
   styling: { dark: string; light: string; errorCorrectionLevel: string };
   routingRules: { ios?: string; android?: string; expiresAt?: string };
   recordId?: string | null;
+  campaignId?: string | null;
+  tagIds?: string[];
+  tags?: { tag: { id: string; name: string; color: string } }[];
 };
 export type Field = {
   key: string;
@@ -645,6 +648,8 @@ export default function Dashboard() {
                   qr={editing}
                   appUrl={data.appUrl}
                   canWrite={canWrite}
+                  tags={data.tags}
+                  campaigns={data.campaigns}
                   onSave={(value, id) =>
                     mutate(id ? "qr.update" : "qr.create", value, id)
                   }
