@@ -7,7 +7,7 @@
     "build": "prisma generate && prisma migrate deploy && next build --webpack",
     "postinstall": "node scripts/ensure-prisma-executable.mjs",
     "start": "next start",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit --incremental false",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "test": "tsx --test tests/*.test.ts",

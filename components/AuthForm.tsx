@@ -97,6 +97,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
             </div>
             {register && <small>Use at least 12 characters.</small>}
           </label>
+          {!register && <Link href="/forgot-password" className="back-link">Forgot password?</Link>}
           {mfaRequired && (
             <label>
               Authenticator code

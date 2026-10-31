@@ -1,17 +1,17 @@
 # QR Manager deployment runbook
 
-Status: local foundation tested; no new production deployment has been made. The old static demo is still the last verified live version. Never upload the old root `qr-code-manager-hostinger.zip`.
+Status: commercial branch deployed to the temporary Hostinger origin below. Keep the original static demo backup separate and never upload the old root `qr-code-manager-hostinger.zip`.
 
 ## Intended public routes
 
-- Website: `https://rosybrown-narwhal-127133.hostingersite.com/`
-- Sign in: `https://rosybrown-narwhal-127133.hostingersite.com/login`
-- Single panel: `https://rosybrown-narwhal-127133.hostingersite.com/dashboard`
+- Website: `https://violet-gerbil-897016.hostingersite.com/`
+- Sign in: `https://violet-gerbil-897016.hostingersite.com/login`
+- Single panel: `https://violet-gerbil-897016.hostingersite.com/dashboard`
 - Dynamic scan: `/s/{shortCode}`
 - Health: `/api/health`
 - Razorpay webhook: `/api/billing/webhook`
 
-These are planned deployment routes, not confirmed live URLs for the new application. A secret-looking URL is not a security measure. The panel checks a server-side session and every API scopes data by workspace. Platform controls are shown inside the same panel only for a server-provisioned platform administrator.
+The temporary Hostinger origin is confirmed live; attach the final custom domain only after DNS and TLS are configured. A secret-looking URL is not a security measure. The panel checks a server-side session and every API scopes data by workspace. Platform controls are shown inside the same panel only for a server-provisioned platform administrator.
 
 ## Preparation
 
@@ -19,8 +19,9 @@ These are planned deployment routes, not confirmed live URLs for the new applica
 2. Back up the current static files. User confirmed the existing data is disposable, but use a separate database for the new schema to make rollback independent.
 3. Create a new MySQL database/user scoped to this application. Store a generated unique password privately. Do not reuse or publish the old repository's secrets.
 4. Set the full environment set from `.env.example` in hosting. `DATABASE_URL` must use `127.0.0.1:3306` inside Hostinger, not the public remote DB hostname. Set `APP_URL` to the exact HTTPS origin above.
-5. Prices are paise: Pro `49900`, Business `149900`. Without valid payment keys/webhook secret, checkout is unavailable and free usage works.
-6. Configure Node 22 or 24. Local tests used Node 26; the actual deployment runtime remains to be tested.
+5. Password recovery is available at `/forgot-password` and `/reset-password`. To deliver reset links, configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL` as private Hostinger environment variables. Without them, the app still returns a privacy-safe generic response, but no email is delivered.
+6. Prices are paise: Pro `49900`, Business `149900`. Without valid payment keys/webhook secret, checkout is unavailable and free usage works.
+7. Configure Node 22 or 24. Local tests used Node 26; the deployed Hostinger build has passed its production build step.
 
 ## Build and database
 
