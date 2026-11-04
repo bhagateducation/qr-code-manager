@@ -48,3 +48,11 @@ export function sendEmailVerificationEmail(to: string, link: string) {
     `Verify your QR Manager account within 24 hours: ${link}`,
   );
 }
+
+export function sendWorkspaceInvitationEmail(to: string, link: string, workspace: string, role: string) {
+  return sendEmail(
+    to,
+    `You have been invited to ${workspace}`,
+    `You were invited as a ${role} member of ${workspace}. Accept the invitation within 7 days: ${link}`,
+  );
+}

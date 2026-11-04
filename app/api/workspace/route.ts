@@ -20,6 +20,7 @@ import {
   limits,
   effectivePlan,
 } from "@/lib/validation";
+import { sendWorkspaceInvitationEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   try {
@@ -182,6 +183,8 @@ export async function POST(request: NextRequest) {
     await rateLimit(`write:${user.id}`, 120, 60);
     const workspaceId = user.workspaceId;
     let oneTimeSecret: string | undefined;
+    let invitationEmail = "";
+    let invitationRole = "";
     const result = await prisma.$transaction(async (tx) => {
       // A workspace row lock serializes quota checks and creates in every instance.
       const workspace = await tx.workspace.update({
@@ -333,6 +336,11 @@ export async function POST(request: NextRequest) {
             data: { title: data.title, data: values },
           });
         }
+      } else if (input.action === "record.publish") {
+        if (!input.id) throw new ApiError(400, "Record is required.");
+        const record = await tx.record.findFirst({ where: { id: input.id, system: { workspaceId } } });
+        if (!record) throw new ApiError(404, "Record not found.");
+        entity = await tx.record.update({ where: { id: record.id }, data: { isPublic: !record.isPublic } });
       } else if (input.action === "tag.create") {
         const data = z
           .object({ name: name, color: z.string().regex(/^#[0-9a-f]{6}$/i).default("#5B43D6") })
@@ -404,6 +412,8 @@ export async function POST(request: NextRequest) {
       } else if (input.action === "team.invite") {
         if (user.role !== "owner") throw new ApiError(403, "Only the workspace owner can invite members.");
         const data = z.object({ email, role: z.enum(["admin", "editor", "viewer"]).default("editor") }).parse(input.data);
+        invitationEmail = data.email;
+        invitationRole = data.role;
         if (await tx.user.findUnique({ where: { email: data.email } })) throw new ApiError(409, "That email already has an account.");
         const token = `invite_${randomBytes(32).toString("base64url")}`;
         oneTimeSecret = token;
@@ -445,6 +455,10 @@ export async function POST(request: NextRequest) {
       });
       return entity;
     });
+    if (input.action === "team.invite" && oneTimeSecret && invitationEmail) {
+      const link = `${process.env.APP_URL}/invite?token=${encodeURIComponent(oneTimeSecret)}`;
+      await sendWorkspaceInvitationEmail(invitationEmail, link, user.workspace.name, invitationRole);
+    }
     return json({ ok: true, entity: result, oneTimeSecret });
   } catch (error) {
     return failure(error);
