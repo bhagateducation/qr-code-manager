@@ -5,6 +5,8 @@ import { api, Field, System } from "./Dashboard";
 type RecordItem = {
   id: string;
   title: string;
+  publicToken: string;
+  isPublic: boolean;
   data: Record<string, string | number | boolean | null>;
 };
 export default function Systems({
@@ -370,6 +372,7 @@ export default function Systems({
                   {system.fields.map((f) => (
                     <th key={f.key}>{f.label}</th>
                   ))}
+                  <th>Public page</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -381,6 +384,11 @@ export default function Systems({
                       <td key={f.key}>{String(r.data[f.key] ?? "—")}</td>
                     ))}
                     <td>
+                      {r.isPublic ? (
+                        <a className="destination" href={`/p/${r.publicToken}`} target="_blank" rel="noopener noreferrer">Open page</a>
+                      ) : <span className="muted">Private</span>}
+                    </td>
+                    <td>
                       <button
                         className="icon-button"
                         disabled={!canWrite}
@@ -391,6 +399,9 @@ export default function Systems({
                         }}
                       >
                         <Pencil size={16} />
+                      </button>
+                      <button className="button small" disabled={!canWrite} onClick={() => void mutate("record.publish", undefined, r.id).then(() => load(system.id)).catch(() => {})}>
+                        {r.isPublic ? "Unpublish" : "Publish"}
                       </button>
                     </td>
                   </tr>

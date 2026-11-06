@@ -671,6 +671,36 @@ tbody tr:last-child td {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
+.public-record-shell {
+  min-height: 100vh;
+}
+.public-record-card {
+  width: min(680px, 100%);
+}
+.public-record-fields {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+}
+.public-record-field {
+  display: grid;
+  gap: 4px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfaff;
+}
+.public-record-field span {
+  color: #7d7489;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.public-record-field strong,
+.public-record-field a {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
 .destination svg {
   flex-shrink: 0;
 }
