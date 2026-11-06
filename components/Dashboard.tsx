@@ -38,6 +38,7 @@ import PasswordSettings from "./PasswordSettings";
 import FeaturePanel from "./FeaturePanel";
 import TeamPanel from "./TeamPanel";
 import MfaSettings from "./MfaSettings";
+import AnalyticsOverview from "./AnalyticsOverview";
 
 export type QR = {
   id: string;
@@ -744,74 +745,97 @@ export default function Dashboard() {
               />
             )}
             {tab === "analytics" && (
-              <div className="panel">
-                <div className="panel-heading">
-                  <div>
-                    <h2>Recent scan activity</h2>
-                    <p className="muted">
-                      Latest 100 scans. Device details are inferred from the
-                      browser; previews and known bots are filtered.
-                    </p>
+              <>
+                <AnalyticsOverview
+                  data={data}
+                  onExport={() =>
+                    saveFile(
+                      "qr-manager-recent-scans.csv",
+                      [
+                        ["QR code", "Time", "Device", "OS", "Browser"],
+                        ...data.logs.map((l) => [
+                          l.qrCode.title,
+                          l.scannedAt,
+                          l.device,
+                          l.os,
+                          l.browser,
+                        ]),
+                      ]
+                        .map((row) => row.map(csvCell).join(","))
+                        .join("\r\n"),
+                      "text/csv;charset=utf-8",
+                    )
+                  }
+                />
+                <div className="panel analytics-log-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Recent scan activity</h2>
+                      <p className="muted">
+                        Latest 100 scans. Device details are inferred from the
+                        browser; previews and known bots are filtered.
+                      </p>
+                    </div>
+                    <div className="table-heading-actions">
+                      <button
+                        className="button small"
+                        onClick={() =>
+                          saveFile(
+                            "qr-manager-recent-scans.csv",
+                            [
+                              ["QR code", "Time", "Device", "OS", "Browser"],
+                              ...data.logs.map((l) => [
+                                l.qrCode.title,
+                                l.scannedAt,
+                                l.device,
+                                l.os,
+                                l.browser,
+                              ]),
+                            ]
+                              .map((row) => row.map(csvCell).join(","))
+                              .join("\r\n"),
+                            "text/csv;charset=utf-8",
+                          )
+                        }
+                      >
+                        <Download size={15} /> Export shown scans
+                      </button>
+                      <a className="button small" href="/api/workspace/export?kind=scans">
+                        <Download size={15} /> Export all scans
+                      </a>
+                    </div>
                   </div>
-                  <button
-                    className="button"
-                    onClick={() =>
-                      saveFile(
-                        "qr-manager-recent-scans.csv",
-                        [
-                          ["QR code", "Time", "Device", "OS", "Browser"],
-                          ...data.logs.map((l) => [
-                            l.qrCode.title,
-                            l.scannedAt,
-                            l.device,
-                            l.os,
-                            l.browser,
-                          ]),
-                        ]
-                          .map((row) => row.map(csvCell).join(","))
-                          .join("\r\n"),
-                        "text/csv;charset=utf-8",
-                      )
-                    }
-                  >
-                    <Download size={17} />
-                    Export shown scans
-                  </button>
-                  <a className="button small" href="/api/workspace/export?kind=scans">
-                    <Download size={15} />
-                    Export all scans
-                  </a>
-                </div>
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>QR code</th>
-                        <th>Time</th>
-                        <th>Device</th>
-                        <th>OS</th>
-                        <th>Browser</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.logs.map((l) => (
-                        <tr key={l.id}>
-                          <td>{l.qrCode.title}</td>
-                          <td>{new Date(l.scannedAt).toLocaleString()}</td>
-                          <td>{l.device}</td>
-                          <td>{l.os}</td>
-                          <td>{l.browser}</td>
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>QR code</th>
+                          <th>Time</th>
+                          <th>Device</th>
+                          <th>OS</th>
+                          <th>Browser</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {data.logs.map((l) => (
+                          <tr key={l.id}>
+                            <td>{l.qrCode.title}</td>
+                            <td>{new Date(l.scannedAt).toLocaleString()}</td>
+                            <td>{l.device}</td>
+                            <td>{l.os}</td>
+                            <td>{l.browser}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {!data.logs.length && (
+                    <p className="empty">
+                      Scan a saved QR code to see activity here.
+                    </p>
+                  )}
                 </div>
-                {!data.logs.length && (
-                  <p className="empty">
-                    Scan a saved QR code to see activity here.
-                  </p>
-                )}
-              </div>
+              </>
             )}
             {tab === "team" && (
               <TeamPanel data={data} canWrite={canWrite} mutate={mutate} />
