@@ -637,26 +637,52 @@ export default function Dashboard() {
                       value: data.scans,
                       icon: BarChart3,
                       note: "Recorded scan events",
+                      tone: "mint",
                     },
                     {
                       label: "Active QR codes",
                       value: data.active,
                       icon: QrCode,
                       note: `Up to ${data.limits.codes} codes on your plan`,
+                      tone: "blue",
                     },
                     {
                       label: "Business systems",
                       value: data.systems.length,
                       icon: Layers,
                       note: `${data.limits.systems} systems included`,
+                      tone: "violet",
+                    },
+                    {
+                      label: "All QR codes",
+                      value: data.total,
+                      icon: Activity,
+                      note: "Active and paused codes",
+                      tone: "amber",
+                    },
+                    {
+                      label: "Team members",
+                      value: data.members.length,
+                      icon: Users,
+                      note: "Workspace collaborators",
+                      tone: "lavender",
+                    },
+                    {
+                      label: "Current plan",
+                      value: data.workspace.plan,
+                      icon: CreditCard,
+                      note: data.workspace.paidUntil
+                        ? `Paid until ${new Date(data.workspace.paidUntil).toLocaleDateString("en-IN")}`
+                        : "Free plan",
+                      tone: "teal",
                     },
                   ].map((stat) => (
-                    <div className="stat" key={stat.label}>
+                    <div className={`stat stat-${stat.tone}`} key={stat.label}>
                       <div className="stat-label">
                         {stat.label}
-                        <stat.icon size={19} />
+                        <span className="stat-icon"><stat.icon size={17} /></span>
                       </div>
-                      <strong>{stat.value.toLocaleString()}</strong>
+                      <strong>{typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}</strong>
                       <small>{stat.note}</small>
                     </div>
                   ))}
