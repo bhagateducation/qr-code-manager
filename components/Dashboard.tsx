@@ -21,6 +21,8 @@ import {
   Play,
   Pencil,
   ExternalLink,
+  Eye,
+  MoreHorizontal,
   Users,
   Activity,
   List,
@@ -267,7 +269,54 @@ export default function Dashboard() {
     );
   const canWrite = ["owner", "admin", "editor"].includes(data.user.role);
   const table = (
-    <div className="panel table-panel">
+    <>
+      <div className="module-frame">
+        <div className="module-surface">
+          <div className="module-rail" role="navigation" aria-label="Workspace modules">
+            {[
+              { id: "codes", label: "QR codes", icon: QrCode, tone: "blue" },
+              { id: "systems", label: "Systems", icon: Layers, tone: "violet" },
+              { id: "records", label: "Records", icon: List, tone: "pink" },
+              { id: "team", label: "Team", icon: Users, tone: "green" },
+              { id: "analytics", label: "Analytics", icon: BarChart3, tone: "orange" },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  type="button"
+                  className={`module-pill ${item.tone} ${tab === item.id ? "active" : ""}`}
+                  key={item.id}
+                  onClick={() => setTab(item.id)}
+                >
+                  <span className="module-pill-icon"><Icon size={17} /></span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+            <button className="module-more" type="button" aria-label="More workspace modules">
+              <MoreHorizontal size={18} />
+            </button>
+          </div>
+          <div className="module-highlight">
+            <div>
+              <strong>{data.qrCodes[0]?.title || "Your first QR code"}</strong>
+              <small>{data.qrCodes[0] ? `${data.qrCodes[0].scanCount.toLocaleString()} scans · ${data.qrCodes[0].isActive ? "Active" : "Paused"}` : "Create a code to connect your next destination."}</small>
+            </div>
+            <div className="module-actions">
+              {data.qrCodes[0] ? (
+                <>
+                  <a className="module-action view" href={`/s/${data.qrCodes[0].shortCode}`} target="_blank" rel="noreferrer"><Eye size={13} /> View</a>
+                  <button className="module-action edit" type="button" onClick={() => { setEditing(data.qrCodes[0]); setTab("codes"); }}><Pencil size={13} /> Edit</button>
+                  {canWrite && <button className="module-action pause" type="button" onClick={() => void mutate("qr.pause", undefined, data.qrCodes[0].id).catch(() => {})}>{data.qrCodes[0].isActive ? "Pause" : "Resume"}</button>}
+                </>
+              ) : canWrite ? (
+                <button className="module-action edit" type="button" onClick={() => { setEditing(null); setTab("codes"); }}>Create QR</button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="panel table-panel">
       <div className="panel-heading">
         <div>
           <h2>Your QR codes</h2>
@@ -461,6 +510,7 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+    </>
   );
   return (
     <div className="app-shell">
