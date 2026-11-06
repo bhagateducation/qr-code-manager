@@ -11,7 +11,9 @@ model Workspace {
   id          String       @id @default(uuid())
   name        String
   slug        String       @unique
-  plan        String       @default("pro")
+  plan        String       @default("free")
+  paidUntil   DateTime?
+  suspended   Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -19,6 +21,14 @@ model Workspace {
   systems     System[]
   qrCodes     QRCode[]
   webhooks    Webhook[]
+  tags        Tag[]
+  automations Automation[]
+  campaigns   Campaign[]
+  integrations Integration[]
+  apiKeys     ApiKey[]
+  invitations Invitation[]
+  payments    Payment[]
+  audits      AuditLog[]
 
   @@map("workspaces")
 }
@@ -29,13 +39,25 @@ model User {
   name         String
   email        String     @unique
   passwordHash String
-  role         String     @default("admin") // owner, admin, editor, viewer
+  role         String     @default("owner") // workspace role, not platform administrator
+  platformAdmin Boolean   @default(false)
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?
+  backupCodes  Json?
+  emailVerifiedAt DateTime?
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sessions     Session[]
 
   @@index([workspaceId])
+  @@unique([emailVerificationTokenHash])
+  @@unique([passwordResetTokenHash])
   @@map("users")
 }
 
@@ -71,12 +93,15 @@ model CustomField {
   system     System    @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
   @@index([systemId])
+  @@unique([systemId, key])
   @@map("custom_fields")
 }
 
 model Record {
   id         String     @id @default(uuid())
   systemId   String
+  publicToken String    @unique @default(uuid())
+  isPublic   Boolean    @default(false)
   title      String
   data       Json       // Key-value store of custom field values
   status     String     @default("active")
@@ -94,6 +119,7 @@ model QRCode {
   id           String     @id @default(uuid())
   workspaceId  String
   recordId     String?
+  campaignId   String?
   shortCode    String     @unique // e.g. "acme-qr-928"
   title        String
   type         String     @default("dynamic_url") // dynamic_url, vcard, menu, wifi, product, etc.
@@ -107,10 +133,13 @@ model QRCode {
 
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   record       Record?    @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  campaign     Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   scanLogs     ScanLog[]
+  tags         QRCodeTag[]
 
   @@index([workspaceId])
   @@index([recordId])
+  @@index([campaignId])
   @@index([shortCode])
   @@map("qr_codes")
 }
@@ -143,7 +172,164 @@ model Webhook {
   createdAt   DateTime   @default(now())
 
   workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
 
   @@index([workspaceId])
   @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id          String   @id @default(uuid())
+  webhookId   String
+  eventType   String
+  payload     Json
+  status      String   @default("pending")
+  responseCode Int?
+  attempts    Int      @default(0)
+  lastError   String?
+  deliveredAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  @@index([webhookId, createdAt])
+  @@index([status, createdAt])
+  @@map("webhook_deliveries")
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  color       String   @default("#5B43D6")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  qrCodes     QRCodeTag[]
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("tags")
+}
+
+model Automation {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name       String
+  kind       String   @default("workflow")
+  config     Json?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, kind])
+  @@map("automations")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  qrCodes     QRCode[]
+  @@index([workspaceId, status])
+  @@map("campaigns")
+}
+
+model QRCodeTag {
+  qrCodeId String
+  tagId    String
+  qrCode   QRCode @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([qrCodeId, tagId])
+  @@index([tagId])
+  @@map("qr_code_tags")
+}
+
+model Integration {
+  id          String   @id @default(uuid())
+  workspaceId String
+  provider    String
+  name        String
+  config      Json?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, provider])
+  @@map("integrations")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  workspaceId String
+  label       String
+  prefix      String
+  tokenHash   String    @unique
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, revokedAt])
+  @@map("api_keys")
+}
+
+model Invitation {
+  id          String    @id @default(uuid())
+  workspaceId String
+  email       String
+  role        String    @default("editor")
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, email])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+model Session {
+  tokenHash String @id
+  userId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RateLimit {
+  key String @id
+  count Int @default(1)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model Payment {
+  id String @id @default(uuid())
+  workspaceId String
+  orderId String @unique
+  paymentId String? @unique
+  plan String
+  amount Int
+  currency String @default("INR")
+  status String @default("created")
+  createdAt DateTime @default(now())
+  paidAt DateTime?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  workspaceId String
+  actorId String
+  action String
+  entityId String?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
 }

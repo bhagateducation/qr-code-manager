@@ -1,9 +1,16 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata } from "next";
+import "./globals.css";
+import "@fontsource/poppins/400.css";
+import "@fontsource/poppins/500.css";
+import "@fontsource/poppins/600.css";
+import "@fontsource/roboto-slab/500.css";
+import "@fontsource/roboto-slab/700.css";
+import "./workspace.css";
 
 export const metadata: Metadata = {
-  title: 'QR Code Manager — Universal QR-Powered Business SaaS',
-  description: 'Commercial standalone QR Code OS with dynamic routing, custom business schemas, and isolated client workspaces.',
+  title: "QR Manager — Every code. Every connection.",
+  description:
+    "Create dynamic QR codes, manage structured business records, and measure scan activity in one workspace.",
 };
 
 export default function RootLayout({

@@ -13,3 +13,10 @@ out/
 .env.development.local
 .env.test.local
 .env.production.local
+*.tsbuildinfo
+.private/
+.task-temp/
+.npm-cache/
+.test-db/
+release/
+artifacts/

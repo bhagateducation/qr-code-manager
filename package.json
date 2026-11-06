@@ -4,38 +4,55 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && prisma migrate deploy && next build --webpack",
+    "postinstall": "node scripts/ensure-prisma-executable.mjs",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "tsc --noEmit --incremental false",
     "db:push": "prisma db push",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test": "tsx --test tests/*.test.ts",
+    "db:migrate": "prisma migrate deploy",
+    "release": "node scripts/prepare-release.mjs"
   },
   "dependencies": {
-    "@prisma/client": "^5.21.1",
-    "bcryptjs": "^2.4.3",
+    "@fontsource/poppins": "^5.3.0",
+    "@fontsource/roboto-slab": "^5.3.0",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
-    "framer-motion": "^11.11.11",
-    "jsonwebtoken": "^9.0.2",
-    "lucide-react": "^0.454.0",
-    "next": "^14.2.16",
+    "framer-motion": "^14.9.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^1.66.0",
+    "next": "^16.4.3",
     "qrcode": "^1.5.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^2.5.4",
-    "three": "^0.169.0"
+    "three": "^0.169.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.17.0",
+    "@types/pngjs": "^6.0.5",
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/three": "^0.169.0",
     "autoprefixer": "^10.4.20",
+    "pngjs": "^7.0.0",
     "postcss": "^8.4.47",
-    "prisma": "^5.21.1",
+    "prettier": "^3.9.10",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.14",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0 <27"
   }
 }
