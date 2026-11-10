@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createHmac, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { destination } from "@/lib/validation";
@@ -43,7 +43,13 @@ export async function GET(
       ? "iOS"
       : /Android/i.test(ua)
         ? "Android"
-        : "Desktop";
+        : /Windows/i.test(ua)
+          ? "Windows"
+          : /Macintosh|Mac OS/i.test(ua)
+            ? "macOS"
+            : /Linux|CrOS/i.test(ua)
+              ? "Linux"
+              : "Other";
     const staticPayload = qr.type !== "dynamic_url" ? qr.targetUrl : null;
     const target = staticPayload
       ? { success: true as const, data: staticPayload }
@@ -95,6 +101,8 @@ export async function GET(
           data: { scanCount: { increment: 1 } },
         }),
       ]);
+      // Webhooks run after the redirect is sent so a slow endpoint never delays the scanner.
+      after(async () => {
       const webhooks = await prisma.webhook.findMany({
         where: { workspaceId: qr.workspaceId, isActive: true },
         select: { id: true, url: true, secret: true, events: true },
@@ -129,7 +137,8 @@ export async function GET(
                   "X-QR-Manager-Signature": `sha256=${signature}`,
                 },
                 body: payload,
-                signal: AbortSignal.timeout(1500),
+                redirect: "error", // a redirect could point at an internal address
+                signal: AbortSignal.timeout(5000),
               });
               await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: response.ok ? "delivered" : "failed", responseCode: response.status, deliveredAt: response.ok ? new Date() : null, lastError: response.ok ? null : `HTTP ${response.status}` } });
             } catch (error) {
@@ -137,6 +146,7 @@ export async function GET(
             }
           }),
       );
+      });
     }
     const response = staticPayload
       ? new NextResponse(staticPayload, {

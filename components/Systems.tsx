@@ -1,71 +1,66 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Plus, X, Layers, Pencil } from "lucide-react";
-import { api, Field, System } from "./Dashboard";
-type RecordItem = {
-  id: string;
-  title: string;
-  publicToken: string;
-  isPublic: boolean;
-  data: Record<string, string | number | boolean | null>;
-};
-export default function Systems({
-  systems,
-  canWrite,
-  mutate,
-}: {
-  systems: System[];
-  canWrite: boolean;
-  mutate: (action: string, data?: unknown, id?: string) => Promise<any>;
-}) {
+import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ExternalLink, Eye, EyeOff, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
+import { api, Ctx, Empty, Field, Modal, itemMotion, listMotion, plural } from "./ui";
+
+type RecordItem = { id: string; title: string; publicToken: string; isPublic: boolean; data: Record<string, string | number | boolean | null> };
+const fieldTypes = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "url", label: "Link" },
+  { value: "boolean", label: "Yes / No" },
+];
+// Field keys are derived from labels so nobody has to type snake_case by hand.
+const toKey = (label: string, index: number) => (label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^[^a-z]+|_+$/g, "").slice(0, 36) || "field") + (index ? `_${index}` : "");
+function withKeys(fields: Field[]) {
+  const seen = new Set<string>();
+  return fields.map((field) => {
+    let index = 0;
+    while (seen.has(toKey(field.label, index))) index++;
+    seen.add(toKey(field.label, index));
+    return { ...field, key: toKey(field.label, index) };
+  });
+}
+
+export default function Systems({ ctx }: { ctx: Ctx }) {
+  const { data, canWrite, mutate, notify, ask } = ctx;
   const [creating, setCreating] = useState(false),
-    [fields, setFields] = useState<Field[]>([
-      {
-        key: "description",
-        label: "Description",
-        type: "text",
-        isRequired: false,
-      },
-    ]),
+    [fields, setFields] = useState<Field[]>([{ key: "", label: "Description", type: "text", isRequired: false }]),
     [selected, setSelected] = useState(""),
     [records, setRecords] = useState<RecordItem[]>([]),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [record, setRecord] = useState<RecordItem | null>(null),
-    [adding, setAdding] = useState(false),
+    [total, setTotal] = useState(0),
     [page, setPage] = useState(1),
-    [total, setTotal] = useState(0);
-  const system = systems.find((s) => s.id === selected);
-  async function load(id: string, index = page) {
+    [editing, setEditing] = useState<RecordItem | null | undefined>(undefined),
+    [busy, setBusy] = useState(false);
+  const system = data.systems.find((item) => item.id === selected);
+
+  const load = useCallback(async () => {
+    if (!selected) return;
     try {
-      const data = await api(
-        `/api/records?systemId=${encodeURIComponent(id)}&page=${index}`,
-      );
-      setRecords(data.records);
-      setTotal(data.total);
+      const result = await api(`/api/records?systemId=${encodeURIComponent(selected)}&page=${page}`);
+      setRecords(result.records);
+      setTotal(result.total);
     } catch (e) {
-      setError((e as Error).message);
+      notify((e as Error).message, "error");
     }
-  }
+  }, [selected, page, notify]);
   useEffect(() => {
-    if (selected) load(selected);
-  }, [selected, page]);
+    load();
+  }, [load]);
+  const setField = (index: number, patch: Partial<Field>) => setFields(fields.map((field, i) => (i === index ? { ...field, ...patch } : field)));
+
   async function createSystem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
-    setError("");
     const form = new FormData(event.currentTarget);
     try {
-      const result = await mutate("system.create", {
-        name: form.get("name"),
-        description: form.get("description"),
-        fields,
-      });
+      const result = await mutate("system.create", { name: form.get("name"), description: form.get("description"), fields: withKeys(fields) });
       setSelected(result.entity.id);
-      setCreating(false);
       setPage(1);
-    } catch (e) {
-      setError((e as Error).message);
+      setCreating(false);
+    } catch {
     } finally {
       setBusy(false);
     }
@@ -74,364 +69,261 @@ export default function Systems({
     event.preventDefault();
     if (!system) return;
     setBusy(true);
-    setError("");
     const form = new FormData(event.currentTarget);
     const values: Record<string, unknown> = {};
     for (const field of system.fields) {
       const raw = form.get(field.key);
-      values[field.key] =
-        field.type === "boolean"
-          ? raw === "on"
-          : field.type === "number"
-            ? raw === ""
-              ? null
-              : Number(raw)
-            : raw;
+      values[field.key] = field.type === "boolean" ? raw === "on" : field.type === "number" ? (raw === "" ? null : Number(raw)) : raw;
     }
     try {
-      await mutate(
-        record ? "record.update" : "record.create",
-        { systemId: system.id, title: form.get("_title"), data: values },
-        record?.id,
-      );
-      await load(system.id);
-      setAdding(false);
-      setRecord(null);
-    } catch (e) {
-      setError((e as Error).message);
+      await mutate(editing ? "record.update" : "record.create", { systemId: system.id, title: form.get("_title"), data: values }, editing?.id);
+      await load();
+      setEditing(undefined);
+    } catch {
     } finally {
       setBusy(false);
     }
   }
+  async function removeSystem() {
+    if (system && (await ask({ title: `Delete “${system.name}”?`, body: `This also deletes its ${plural(system._count.records, "record")} and their public pages. This cannot be undone.`, action: "Delete system" }))) {
+      await mutate("system.delete", undefined, system.id).catch(() => {});
+      setSelected("");
+    }
+  }
+  async function removeRecord(record: RecordItem) {
+    if (await ask({ title: `Delete “${record.title}”?`, body: "The record and its public page are removed. This cannot be undone.", action: "Delete record" })) await mutate("record.delete", undefined, record.id).then(load, () => {});
+  }
+
   return (
-    <div className="stack">
-      {error && (
-        <p className="notice error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="panel-heading">
-        <div>
-          <h2>Shape the information behind your business.</h2>
-          <p className="muted">
-            Create a system, define its fields, then save your records.
-          </p>
+    <div className="page-stack">
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Your systems</h2>
+            <p className="muted">
+              A system is a custom table, such as products, assets or members. {data.systems.length} of {data.limits.systems} used.
+            </p>
+          </div>
+          {canWrite && !creating && (
+            <button className="button primary" onClick={() => setCreating(true)}>
+              <Plus size={16} /> New system
+            </button>
+          )}
         </div>
-        {canWrite && (
-          <button className="button" onClick={() => setCreating(!creating)}>
-            <Plus size={17} />
-            New system
-          </button>
+        {data.systems.length ? (
+          <motion.div className="systems-grid" variants={listMotion} initial="hidden" animate="show">
+            {data.systems.map((item) => (
+              <motion.button
+                variants={itemMotion}
+                key={item.id}
+                className={`panel system-card ${selected === item.id ? "current" : ""}`}
+                aria-pressed={selected === item.id}
+                onClick={() => {
+                  setSelected(item.id);
+                  setPage(1);
+                }}
+              >
+                <Layers />
+                <strong>{item.name}</strong>
+                <span>
+                  {plural(item.fields.length, "field")} · {plural(item._count.records, "record")}
+                </span>
+              </motion.button>
+            ))}
+          </motion.div>
+        ) : (
+          !creating && <Empty icon={Layers} title="No systems yet" text="Create one to store structured records and give each a public page a QR code can open." />
         )}
       </div>
-      {creating && (
-        <form className="panel stack view-enter" onSubmit={createSystem}>
-          <h2>Create a business system</h2>
-          <div className="form-grid">
-            <label>
-              System name
-              <input
-                name="name"
-                required
-                maxLength={100}
-                placeholder="e.g. Product inventory"
-              />
-            </label>
-            <label>
-              Description
-              <input name="description" maxLength={500} />
-            </label>
-          </div>
-          <h3>Custom fields</h3>
-          {fields.map((f, i) => (
-            <div className="field-editor" key={i}>
+
+      <AnimatePresence>
+        {creating && (
+          <motion.form className="panel stack" onSubmit={createSystem} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+            <h2>New system</h2>
+            <div className="form-grid">
               <label>
-                Label
-                <input
-                  value={f.label}
-                  required
-                  onChange={(e) =>
-                    setFields(
-                      fields.map((item, j) =>
-                        j === i ? { ...item, label: e.target.value } : item,
-                      ),
-                    )
-                  }
-                />
+                Name
+                <input name="name" required maxLength={100} placeholder="e.g. Product inventory" autoFocus />
               </label>
               <label>
-                Key
-                <input
-                  value={f.key}
-                  required
-                  pattern="[a-z][a-z0-9_]{0,39}"
-                  onChange={(e) =>
-                    setFields(
-                      fields.map((item, j) =>
-                        j === i ? { ...item, key: e.target.value } : item,
-                      ),
-                    )
-                  }
-                />
+                Description
+                <input name="description" maxLength={500} placeholder="Optional" />
               </label>
-              <label>
-                Type
-                <select
-                  value={f.type}
-                  onChange={(e) =>
-                    setFields(
-                      fields.map((item, j) =>
-                        j === i ? { ...item, type: e.target.value } : item,
-                      ),
-                    )
-                  }
-                >
-                  {["text", "number", "date", "url", "boolean"].map((type) => (
-                    <option key={type}>{type}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={f.isRequired}
-                  onChange={(e) =>
-                    setFields(
-                      fields.map((item, j) =>
-                        j === i
-                          ? { ...item, isRequired: e.target.checked }
-                          : item,
-                      ),
-                    )
-                  }
-                />
-                Required
-              </label>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={`Remove ${f.label}`}
-                onClick={() => setFields(fields.filter((_, j) => j !== i))}
-              >
-                <X size={16} />
+            </div>
+            <h3>Fields</h3>
+            {fields.map((field, index) => (
+              <div className="field-editor" key={index}>
+                <label>
+                  Field name
+                  <input value={field.label} required maxLength={100} onChange={(e) => setField(index, { label: e.target.value })} />
+                </label>
+                <label>
+                  Type
+                  <select value={field.type} onChange={(e) => setField(index, { type: e.target.value })}>
+                    {fieldTypes.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="checkbox">
+                  <input type="checkbox" checked={field.isRequired} onChange={(e) => setField(index, { isRequired: e.target.checked })} /> Required
+                </label>
+                <span />
+                <button type="button" className="icon-button danger" aria-label={`Remove ${field.label || "field"}`} onClick={() => setFields(fields.filter((_, i) => i !== index))}>
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+            <small>Fields cannot be changed after the system is created, so add everything you need now.</small>
+            <div className="row-actions">
+              <button type="button" className="button" disabled={fields.length >= 30} onClick={() => setFields([...fields, { key: "", label: "", type: "text", isRequired: false }])}>
+                <Plus size={16} /> Add field
+              </button>
+              <span className="grow" />
+              <button type="button" className="button" onClick={() => setCreating(false)}>
+                Cancel
+              </button>
+              <button disabled={busy} className="button primary">
+                {busy ? "Creating…" : "Create system"}
               </button>
             </div>
-          ))}
-          <div className="row-actions">
-            <button
-              type="button"
-              className="button"
-              disabled={fields.length >= 30}
-              onClick={() =>
-                setFields([
-                  ...fields,
-                  {
-                    key: `field_${fields.length + 1}`,
-                    label: "New field",
-                    type: "text",
-                    isRequired: false,
-                  },
-                ])
-              }
-            >
-              <Plus size={16} />
-              Add field
-            </button>
-            <button disabled={busy} className="button primary">
-              Save system
-            </button>
-            <button
-              type="button"
-              className="button"
-              onClick={() => setCreating(false)}
-            >
-              Cancel
-            </button>
-          </div>
-          <small>
-            Choose your schema carefully. Editing existing schemas with data
-            migration is not yet available.
-          </small>
-        </form>
-      )}
-      <div className="systems-grid">
-        {systems.map((s) => (
-          <button
-            key={s.id}
-            className={`panel system-card ${selected === s.id ? "current" : ""}`}
-            onClick={() => {
-              setSelected(s.id);
-              setPage(1);
-              setAdding(false);
-            }}
-          >
-            <Layers size={24} />
-            <strong>{s.name}</strong>
-            <span>
-              {s.fields.length} fields · {s._count.records} records
-            </span>
-          </button>
-        ))}
-      </div>
-      {!systems.length && !creating && (
-        <div className="panel empty">
-          <Layers size={32} />
-          <h3>A place for your business information.</h3>
-          <p>Create your first system to start adding structured records.</p>
-        </div>
-      )}
+          </motion.form>
+        )}
+      </AnimatePresence>
+
       {system && (
-        <div className="panel">
+        <motion.div className="panel flush" key={system.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <div className="panel-heading">
             <div>
               <h2>{system.name}</h2>
-              <p className="muted">{system.description}</p>
+              {system.description && <p className="muted">{system.description}</p>}
             </div>
             {canWrite && (
-              <button
-                className="button primary"
-                onClick={() => {
-                  setRecord(null);
-                  setAdding(true);
-                }}
-              >
-                <Plus size={16} />
-                Add record
-              </button>
+              <div className="row-actions">
+                <button className="icon-button danger" aria-label={`Delete ${system.name}`} title="Delete system" onClick={removeSystem}>
+                  <Trash2 size={16} />
+                </button>
+                <button className="button primary" onClick={() => setEditing(null)}>
+                  <Plus size={16} /> Add record
+                </button>
+              </div>
             )}
           </div>
-          {adding && (
-            <form
-              key={record?.id || "new"}
-              className="stack record-form"
-              onSubmit={saveRecord}
-            >
-              <h3>{record ? "Edit record" : "New record"}</h3>
-              <label>
-                Record title
-                <input
-                  name="_title"
-                  required
-                  maxLength={100}
-                  defaultValue={record?.title}
-                />
-              </label>
-              <div className="form-grid">
-                {system.fields.map((f) => (
-                  <label
-                    key={f.key}
-                    className={f.type === "boolean" ? "checkbox" : ""}
-                  >
-                    {f.label}
-                    {f.isRequired ? " *" : ""}
-                    {f.type === "boolean" ? (
-                      <input
-                        name={f.key}
-                        type="checkbox"
-                        defaultChecked={!!record?.data[f.key]}
-                      />
-                    ) : (
-                      <input
-                        name={f.key}
-                        type={
-                          f.type === "number"
-                            ? "number"
-                            : f.type === "url"
-                              ? "url"
-                              : f.type === "date"
-                                ? "date"
-                                : "text"
-                        }
-                        step={f.type === "number" ? "any" : undefined}
-                        required={f.isRequired}
-                        defaultValue={String(record?.data[f.key] ?? "")}
-                      />
-                    )}
-                  </label>
-                ))}
-              </div>
-              <div className="row-actions">
-                <button disabled={busy} className="button primary">
-                  Save record
-                </button>
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() => setAdding(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  {system.fields.map((f) => (
-                    <th key={f.key}>{f.label}</th>
-                  ))}
-                  <th>Public page</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.title}</td>
-                    {system.fields.map((f) => (
-                      <td key={f.key}>{String(r.data[f.key] ?? "—")}</td>
+          {records.length ? (
+            <div className="table-scroll">
+              <table className="cards">
+                <thead>
+                  <tr>
+                    <th>Record</th>
+                    {system.fields.slice(0, 3).map((field) => (
+                      <th key={field.key}>{field.label}</th>
                     ))}
-                    <td>
-                      {r.isPublic ? (
-                        <a className="destination" href={`/p/${r.publicToken}`} target="_blank" rel="noopener noreferrer">Open page</a>
-                      ) : <span className="muted">Private</span>}
-                    </td>
-                    <td>
-                      <button
-                        className="icon-button"
-                        disabled={!canWrite}
-                        aria-label={`Edit ${r.title}`}
-                        onClick={() => {
-                          setRecord(r);
-                          setAdding(true);
-                        }}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button className="button small" disabled={!canWrite} onClick={() => void mutate("record.publish", undefined, r.id).then(() => load(system.id)).catch(() => {})}>
-                        {r.isPublic ? "Unpublish" : "Publish"}
-                      </button>
-                    </td>
+                    <th>Public page</th>
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!records.length && <p className="empty">No records yet.</p>}
+                </thead>
+                <tbody>
+                  {records.map((record) => (
+                    <tr key={record.id}>
+                      <td>
+                        <strong>{record.title}</strong>
+                      </td>
+                      {system.fields.slice(0, 3).map((field) => {
+                        const value = record.data[field.key];
+                        return (
+                          <td key={field.key} data-label={field.label}>
+                            <span className="truncate" style={{ maxWidth: 200, display: "inline-block" }}>
+                              {value === null || value === undefined || value === "" ? "—" : typeof value === "boolean" ? (value ? "Yes" : "No") : String(value)}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td data-label="Public page">
+                        {record.isPublic ? (
+                          <a className="destination" href={`/p/${record.publicToken}`} target="_blank" rel="noopener noreferrer">
+                            <span>Open page</span> <ExternalLink size={13} />
+                          </a>
+                        ) : (
+                          <span className="badge neutral">Private</span>
+                        )}
+                      </td>
+                      <td className="actions">
+                        {canWrite && (
+                          <div className="row-actions" style={{ flexWrap: "nowrap", justifyContent: "flex-end", gap: 2 }}>
+                            <button className="icon-button" title={record.isPublic ? "Make private" : "Publish a public page"} aria-label={`${record.isPublic ? "Unpublish" : "Publish"} ${record.title}`} onClick={() => void mutate("record.publish", undefined, record.id).then(load, () => {})}>
+                              {record.isPublic ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                            <button className="icon-button" title="Edit" aria-label={`Edit ${record.title}`} onClick={() => setEditing(record)}>
+                              <Pencil size={16} />
+                            </button>
+                            <button className="icon-button danger" title="Delete" aria-label={`Delete ${record.title}`} onClick={() => removeRecord(record)}>
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <Empty icon={Layers} title="No records yet" text="Add the first record. Publish it to get a public page you can point a QR code at." />
+          )}
           <div className="pagination">
-            <span>{total} records</span>
+            <span>{plural(total, "record")}</span>
             <div>
-              <button
-                className="button small"
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-              >
+              <button className="button small" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Previous
               </button>
-              <span>{page}</span>
-              <button
-                className="button small"
-                disabled={page * 25 >= total}
-                onClick={() => setPage(page + 1)}
-              >
+              <span>Page {page}</span>
+              <button className="button small" disabled={page * 25 >= total} onClick={() => setPage(page + 1)}>
                 Next
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+
+      <AnimatePresence>
+        {system && editing !== undefined && (
+          <Modal wide title={editing ? "Edit record" : `New record in ${system.name}`} onClose={() => setEditing(undefined)}>
+            <form className="stack" onSubmit={saveRecord}>
+              <label>
+                Title
+                <input name="_title" required maxLength={100} defaultValue={editing?.title || ""} />
+              </label>
+              <div className="form-grid">
+                {system.fields.map((field) => {
+                  const value = editing?.data[field.key];
+                  return field.type === "boolean" ? (
+                    <label className="checkbox" key={field.key}>
+                      <input type="checkbox" name={field.key} defaultChecked={value === true} /> {field.label}
+                    </label>
+                  ) : (
+                    <label key={field.key}>
+                      {field.label}
+                      <input name={field.key} type={field.type === "text" ? "text" : field.type} step={field.type === "number" ? "any" : undefined} required={field.isRequired} maxLength={4000} defaultValue={value === null || value === undefined ? "" : String(value)} placeholder={field.type === "url" ? "https://" : undefined} />
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="button" onClick={() => setEditing(undefined)}>
+                  Cancel
+                </button>
+                <button disabled={busy} className="button primary">
+                  {busy ? "Saving…" : "Save record"}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

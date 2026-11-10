@@ -52,13 +52,13 @@ export async function GET(request: NextRequest) {
       payments,
       members,
       tags,
-      automations,
       campaigns,
-      integrations,
       webhooks,
       apiKeys,
       webhookDeliveries,
       invitations,
+      topCodes,
+      recordCount,
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       prisma.scanLog.findMany({
         where: { qrCode: { workspaceId } },
         include: { qrCode: { select: { title: true } } },
-        take: 100,
+        take: 20,
         orderBy: { scannedAt: "desc" },
       }),
       prisma.auditLog.findMany({
@@ -112,13 +112,13 @@ export async function GET(request: NextRequest) {
         take: 100,
       }),
       prisma.tag.findMany({ where: { workspaceId }, orderBy: { name: "asc" } }),
-      prisma.automation.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
       prisma.campaign.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
-      prisma.integration.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100 }),
       prisma.webhook.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, url: true, events: true, isActive: true, createdAt: true } }),
       prisma.apiKey.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, label: true, prefix: true, lastUsedAt: true, revokedAt: true, createdAt: true } }),
       prisma.webhookDelivery.findMany({ where: { webhook: { workspaceId } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, eventType: true, status: true, responseCode: true, attempts: true, lastError: true, createdAt: true, deliveredAt: true, webhook: { select: { url: true } } } }),
       prisma.invitation.findMany({ where: { workspaceId, acceptedAt: null }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, email: true, role: true, expiresAt: true, createdAt: true } }),
+      prisma.qRCode.findMany({ where: { workspaceId, scanCount: { gt: 0 } }, orderBy: { scanCount: "desc" }, take: 5, select: { id: true, title: true, scanCount: true } }),
+      prisma.record.count({ where: { system: { workspaceId } } }),
     ]);
     const plan = effectivePlan(user.workspace);
     const prices = {
@@ -149,13 +149,13 @@ export async function GET(request: NextRequest) {
       payments,
       members,
       tags,
-      automations,
       campaigns,
-      integrations,
       webhooks,
       apiKeys,
       webhookDeliveries,
       invitations,
+      topCodes,
+      recordCount,
       limits: limits[plan],
       prices,
       checkoutReady: !!(
@@ -195,6 +195,9 @@ export async function POST(request: NextRequest) {
         throw new ApiError(403, "This workspace is suspended.");
       const quota = limits[effectivePlan(workspace)];
       let entity: { id: string } | null = null;
+      // Outbound credentials and endpoints can leak workspace data, so editors cannot manage them.
+      if (/^(webhook|apiKey)./.test(input.action) && !["owner", "admin"].includes(user.role))
+        throw new ApiError(403, "Only owners and admins can manage API keys and webhooks.");
       if (input.action === "qr.create" || input.action === "qr.update") {
         const data = qrSchema.parse(input.data);
         const { tagIds, campaignId, ...qrData } = data;
@@ -277,6 +280,18 @@ export async function POST(request: NextRequest) {
           where: { id: qr.id },
           data: { isActive: !qr.isActive },
         });
+      } else if (input.action === "qr.delete") {
+        if (!input.id) throw new ApiError(400, "QR is required.");
+        entity = await tx.qRCode.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "QR not found.");
+      } else if (input.action === "system.delete") {
+        if (!input.id) throw new ApiError(400, "System is required.");
+        entity = await tx.system.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "System not found.");
+      } else if (input.action === "record.delete") {
+        if (!input.id) throw new ApiError(400, "Record is required.");
+        entity = await tx.record.deleteMany({ where: { id: input.id, system: { workspaceId } } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Record not found.");
       } else if (input.action === "system.create") {
         const data = systemSchema.parse(input.data);
         if (
@@ -350,20 +365,6 @@ export async function POST(request: NextRequest) {
         if (!input.id) throw new ApiError(400, "Tag is required.");
         entity = await tx.tag.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "Tag not found.");
-      } else if (input.action === "automation.create") {
-        const data = z
-          .object({ name, kind: z.enum(["function", "workflow"]), config: z.unknown().optional() })
-          .parse(input.data);
-        entity = await tx.automation.create({ data: { ...data, config: data.config as any, workspaceId } });
-      } else if (input.action === "automation.toggle") {
-        if (!input.id) throw new ApiError(400, "Automation is required.");
-        const automation = await tx.automation.findFirst({ where: { id: input.id, workspaceId } });
-        if (!automation) throw new ApiError(404, "Automation not found.");
-        entity = await tx.automation.update({ where: { id: automation.id }, data: { isActive: !automation.isActive } });
-      } else if (input.action === "automation.delete") {
-        if (!input.id) throw new ApiError(400, "Automation is required.");
-        entity = await tx.automation.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
-        if (!entity) throw new ApiError(404, "Automation not found.");
       } else if (input.action === "campaign.create") {
         const data = z.object({ name, description: z.string().max(500).optional(), status: z.enum(["draft", "active", "paused"]).default("draft") }).parse(input.data);
         entity = await tx.campaign.create({ data: { ...data, workspaceId } });
@@ -376,20 +377,8 @@ export async function POST(request: NextRequest) {
         if (!input.id) throw new ApiError(400, "Campaign is required.");
         entity = await tx.campaign.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "Campaign not found.");
-      } else if (input.action === "integration.create") {
-        const data = z.object({ provider: name, name, config: z.unknown().optional() }).parse(input.data);
-        entity = await tx.integration.create({ data: { ...data, config: data.config as any, workspaceId } });
-      } else if (input.action === "integration.toggle") {
-        if (!input.id) throw new ApiError(400, "Integration is required.");
-        const integration = await tx.integration.findFirst({ where: { id: input.id, workspaceId } });
-        if (!integration) throw new ApiError(404, "Integration not found.");
-        entity = await tx.integration.update({ where: { id: integration.id }, data: { status: integration.status === "active" ? "paused" : "active" } });
-      } else if (input.action === "integration.delete") {
-        if (!input.id) throw new ApiError(400, "Integration is required.");
-        entity = await tx.integration.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
-        if (!entity) throw new ApiError(404, "Integration not found.");
       } else if (input.action === "webhook.create") {
-        const data = z.object({ url: destination, events: z.array(z.string().min(1).max(80)).min(1).max(20) }).parse(input.data);
+        const data = z.object({ url: destination, events: z.array(z.literal("scan.created")).min(1).max(1).default(["scan.created"]) }).parse(input.data);
         oneTimeSecret = `whsec_${randomBytes(24).toString("base64url")}`;
         entity = await tx.webhook.create({ data: { ...data, workspaceId, secret: oneTimeSecret } });
       } else if (input.action === "webhook.toggle") {

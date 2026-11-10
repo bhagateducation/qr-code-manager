@@ -1,319 +1,216 @@
 import Link from "next/link";
-import {
-  QrCode,
-  ArrowUpRight,
-  Check,
-  Layers,
-  BarChart3,
-  ArrowRight,
-  ShieldCheck,
-  RefreshCw,
-} from "lucide-react";
 import QRCode from "qrcode";
+import { ArrowRight, BarChart3, Check, Code2, Layers, QrCode, RefreshCw, ShieldCheck, Smartphone, Users } from "lucide-react";
+import { BRAND } from "@/lib/brand";
+import { limits } from "@/lib/validation";
+import Reveal from "@/components/Reveal";
+import { ThemeControl } from "@/components/ui";
+
+const features = [
+  { icon: RefreshCw, title: "Change the link, keep the print", text: "Every website code is dynamic. Update its destination, pause it or set an end date without reprinting anything." },
+  { icon: QrCode, title: "Four code types", text: "Website links, Wi-Fi access, contact cards and plain text. Each download is scan-tested before you get it, as PNG or vector SVG." },
+  { icon: Smartphone, title: "Route by device", text: "Send iPhone users to the App Store, Android users to Google Play and everyone else to your site, from one code." },
+  { icon: Layers, title: "Records with public pages", text: "Build your own tables for products, assets or members, then publish any record as a page a QR code can open." },
+  { icon: BarChart3, title: "Scan analytics", text: "See scans per day, busiest hours, devices and your top codes. Export everything to CSV." },
+  { icon: Users, title: "Built for teams", text: "Invite teammates as admin, editor or viewer. Every change is written to an audit log." },
+  { icon: Code2, title: "API and webhooks", text: "Create codes from your own software and receive a signed event the moment a code is scanned." },
+  { icon: ShieldCheck, title: "Secure by default", text: "Two-step sign-in, hashed sessions and keys, and strict separation between workspaces." },
+];
+const steps = [
+  ["Create a workspace", "Sign up free in under a minute."],
+  ["Add a destination", "Name your code and paste a link."],
+  ["Download and print", "Use the scan-tested PNG or SVG."],
+  ["Measure and update", "Watch scans and change the link any time."],
+];
+
 export default async function Home() {
-  const demo = await QRCode.toDataURL(
-    process.env.APP_URL || "https://rosybrown-narwhal-127133.hostingersite.com",
-    { width: 320, margin: 4, color: { dark: "#17161D", light: "#FFFFFF" } },
-  );
+  const demo = await QRCode.toDataURL(process.env.APP_URL || "https://example.com", { width: 320, margin: 2, color: { dark: "#29283d", light: "#FFFFFF" } });
+  const plans = [
+    { id: "free", name: "Free", price: 0, note: "For your first codes" },
+    { id: "pro", name: "Pro", price: Number(process.env.PLAN_PRO_PAISE || 0) / 100, note: "For growing teams and campaigns" },
+    { id: "business", name: "Business", price: Number(process.env.PLAN_BUSINESS_PAISE || 0) / 100, note: "For large collections and operations" },
+  ];
   return (
-    <div className="marketing">
-      <header className="marketing-nav">
+    <>
+      <header className="site-nav">
         <Link href="/" className="brand">
           <span className="brand-mark">
-            <QrCode size={22} />
+            <QrCode size={20} />
           </span>
-          QR Manager
+          {BRAND}
         </Link>
-        <nav aria-label="Main navigation">
+        <nav aria-label="Main">
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
           <a href="#pricing">Pricing</a>
         </nav>
-        <div className="row-actions">
+        <div className="row-actions" style={{ flexWrap: "nowrap" }}>
+          <ThemeControl />
           <Link href="/login" className="button">
             Sign in
           </Link>
           <Link href="/register" className="button primary">
-            Start free <ArrowUpRight size={16} />
+            Start free
           </Link>
         </div>
       </header>
       <main>
-        <section className="marketing-hero">
-          <div className="hero-copy">
-            <span className="badge">
-              <span className="status-dot" />A better connection starts here
-            </span>
+        <section className="site-section hero">
+          <Reveal className="hero-copy">
+            <span className="badge">Dynamic QR codes for business</span>
             <h1>
-              Small code.
+              Print once.
               <br />
-              Endless possibilities.
+              <em>Update forever.</em>
             </h1>
-            <p>
-              Bring your physical world online. Create QR codes that evolve with
-              your business, organise your records, and see every connection in
-              one workspace.
-            </p>
-            <div className="hero-actions">
-              <Link href="/register" className="button primary">
-                Create your first QR <ArrowRight size={17} />
+            <p>Create QR codes whose destination you can change at any time, connect them to your own business records, and see every scan in one workspace.</p>
+            <div className="row-actions">
+              <Link href="/register" className="button primary large">
+                Create your first code <ArrowRight size={17} />
               </Link>
-              <a href="#how-it-works" className="button">
+              <a href="#how-it-works" className="button large">
                 See how it works
               </a>
             </div>
             <div className="hero-notes">
               <span>
-                <Check size={15} />
-                Free plan included
+                <Check size={15} /> Free plan with {limits.free.codes} codes
               </span>
               <span>
-                <Check size={15} />
-                No card required
+                <Check size={15} /> No card needed
               </span>
             </div>
-          </div>
-          <div className="hero-workbench">
-            <div className="workbench-top">
-              <span className="window-dots">
-                <i />
-                <i />
-                <i />
-              </span>
-              <strong>Your next connection</strong>
-              <span className="badge">Example</span>
-            </div>
-            <div className="sample-qr">
-              <div className="sample-label">
-                <span className="mini-icon">
+          </Reveal>
+          <Reveal delay={0.12}>
+            <div className="hero-card">
+              <div className="hero-card-row">
+                <span className="qr-tile">
                   <QrCode size={18} />
                 </span>
+                <div className="grow">
+                  <strong>Summer menu</strong>
+                  <small style={{ display: "block" }}>Website link · dynamic</small>
+                </div>
+                <span className="status active">Active</span>
+              </div>
+              <div className="hero-qr">
+                <img src={demo} alt={`Sample QR code that opens the ${BRAND} website`} width={232} height={232} />
+              </div>
+              <div className="hero-mini">
                 <div>
-                  <strong>Your business, one scan away</strong>
-                  <small>Dynamic website QR</small>
+                  <strong>PNG · SVG</strong>
+                  <small>Scan-tested</small>
                 </div>
-                <span className="status active">Ready</span>
-              </div>
-              <div className="hero-qr-art">
-                <img
-                  src={demo}
-                  alt="Sample QR linking to the QR Manager homepage"
-                  width={232}
-                  height={232}
-                />
-                <span className="corner tl" />
-                <span className="corner tr" />
-                <span className="corner bl" />
-                <span className="corner br" />
-              </div>
-              <p className="sample-url">
-                Scan to explore QR Manager <ArrowUpRight size={15} />
-              </p>
-              <div className="sample-detail">
-                <RefreshCw size={18} />
-                <span>New destination. Same printed code.</span>
+                <div>
+                  <strong>iOS · Android</strong>
+                  <small>Device routing</small>
+                </div>
+                <div>
+                  <strong>Live</strong>
+                  <small>Scan analytics</small>
+                </div>
               </div>
             </div>
-            <div className="connection-note">
-              <ShieldCheck size={21} />
-              <div>
-                <strong>A workspace of your own.</strong>
-                <small>Access is checked before your data is shared.</small>
-              </div>
-            </div>
-          </div>
+          </Reveal>
         </section>
-        <section className="use-cases">
-          <p>Built for everyday business connections</p>
-          <div>
-            <span>Menus & hospitality</span>
-            <span>Product packaging</span>
-            <span>Business websites</span>
-            <span>Asset records</span>
-            <span>Campaign links</span>
-          </div>
-        </section>
-        <section id="features" className="marketing-section">
-          <div className="section-intro">
-            <h2>
-              Less to manage.
-              <br />
-              More to connect.
-            </h2>
-            <p>
-              Your codes, destinations and business information belong together.
-              QR Manager keeps them in a single, organised workspace.
-            </p>
-          </div>
-          <div className="features-grid">
-            {[
-              {
-                icon: RefreshCw,
-                title: "Change the link. Keep the QR.",
-                text: "Update destinations without replacing printed materials. Pause a code or set an expiry when a campaign ends.",
-              },
-              {
-                icon: Layers,
-                title: "Give your information a home.",
-                text: "Define custom text, number, date, URL and checkbox fields, then create and edit structured business records.",
-              },
-              {
-                icon: BarChart3,
-                title: "See the connections happen.",
-                text: "Track scan counts and recent device activity. Export the displayed scan report as a CSV.",
-              },
-            ].map((f) => (
-              <article key={f.title}>
-                <span className="feature-icon">
-                  <f.icon size={25} />
-                </span>
-                <h3>{f.title}</h3>
-                <p>{f.text}</p>
-              </article>
+        <div className="strip">
+          {["Restaurant menus", "Product packaging", "Business cards", "Asset labels", "Event tickets", "Guest Wi-Fi"].map((item) => (
+            <span className="chip" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+
+        <section id="features" className="site-section">
+          <Reveal className="section-intro">
+            <h2>Everything a printed code needs after it is printed</h2>
+            <p>Codes, destinations, business data and scan activity live together, so nothing gets lost between tools.</p>
+          </Reveal>
+          <div className="features-grid four">
+            {features.map((feature, index) => (
+              <Reveal key={feature.title} delay={(index % 4) * 0.06}>
+                <article className="panel feature-card" style={{ height: "100%" }}>
+                  <feature.icon />
+                  <h3>{feature.title}</h3>
+                  <p>{feature.text}</p>
+                </article>
+              </Reveal>
             ))}
           </div>
         </section>
-        <section
-          id="how-it-works"
-          className="marketing-section process-section"
-        >
-          <div className="section-intro">
-            <h2>
-              From an idea
-              <br />
-              to a working QR.
-            </h2>
-            <p>Simple steps. A permanent connection.</p>
-          </div>
-          <div className="process-grid">
-            {[
-              {
-                n: "01",
-                title: "Create your workspace",
-                text: "Sign up and start on the Free plan.",
-              },
-              {
-                n: "02",
-                title: "Save your destination",
-                text: "Name your QR and add its website link.",
-              },
-              {
-                n: "03",
-                title: "Download and print",
-                text: "Use a decoded PNG or a true vector SVG.",
-              },
-              {
-                n: "04",
-                title: "Manage and measure",
-                text: "Update destinations and review scan activity.",
-              },
-            ].map((step) => (
-              <article key={step.n}>
-                <span>{step.n}</span>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
-              </article>
+
+        <section id="how-it-works" className="site-section">
+          <Reveal className="section-intro">
+            <h2>From idea to working code in four steps</h2>
+          </Reveal>
+          <div className="steps">
+            {steps.map(([title, text], index) => (
+              <Reveal key={title} delay={index * 0.06} className="step">
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </Reveal>
             ))}
           </div>
         </section>
-        <section id="pricing" className="marketing-section">
-          <div className="section-intro">
-            <h2>
-              A plan for your
-              <br />
-              next stage.
-            </h2>
-            <p>
-              Start free. Choose more capacity when your business needs it. Paid
-              plans will open once payment activation is complete.
-            </p>
-          </div>
+
+        <section id="pricing" className="site-section">
+          <Reveal className="section-intro">
+            <h2>Simple plans that grow with you</h2>
+            <p>Start free. Paid plans last 30 days and never renew on their own.</p>
+          </Reveal>
           <div className="plans-grid">
-            {[
-              { name: "Free", price: 0, codes: 10, systems: 1, records: 50 },
-              {
-                name: "Pro",
-                price: 499,
-                codes: 500,
-                systems: 10,
-                records: 5000,
-              },
-              {
-                name: "Business",
-                price: 1499,
-                codes: 2500,
-                systems: 50,
-                records: 25000,
-              },
-            ].map((plan) => (
-              <article
-                className={`panel plan ${plan.name === "Pro" ? "featured" : ""}`}
-                key={plan.name}
-              >
-                <h3>{plan.name}</h3>
-                <div className="price">
-                  ₹{plan.price.toLocaleString("en-IN")}
-                  <small>/{plan.price ? "30 days" : "forever"}</small>
-                </div>
-                <p>
-                  {plan.name === "Free"
-                    ? "For your first business connections."
-                    : plan.name === "Pro"
-                      ? "For growing teams and campaigns."
-                      : "For larger collections and operations."}
-                </p>
-                <ul>
-                  <li>
-                    <Check size={16} />
-                    {plan.codes.toLocaleString()} dynamic QR codes
-                  </li>
-                  <li>
-                    <Check size={16} />
-                    {plan.systems} business systems
-                  </li>
-                  <li>
-                    <Check size={16} />
-                    {plan.records.toLocaleString()} records
-                  </li>
-                  <li>
-                    <Check size={16} />
-                    PNG & SVG downloads
-                  </li>
-                  <li>
-                    <Check size={16} />
-                    Scan activity & device routing
-                  </li>
-                </ul>
-                <Link
-                  className={`button ${plan.name === "Pro" ? "primary" : ""}`}
-                  href="/register"
-                >
-                  Start with a free account <ArrowUpRight size={15} />
-                </Link>
-              </article>
-            ))}
+            {plans.map((plan, index) => {
+              const limit = limits[plan.id];
+              return (
+                <Reveal key={plan.id} delay={index * 0.06}>
+                  <article className={`panel plan ${plan.id === "pro" ? "featured" : ""}`} style={{ height: "100%" }}>
+                    <div className="row-actions" style={{ justifyContent: "space-between" }}>
+                      <h3 style={{ fontSize: 16 }}>{plan.name}</h3>
+                      {plan.id === "pro" && <span className="badge">Most popular</span>}
+                    </div>
+                    <p className="price">
+                      {plan.id === "free" || plan.price ? `₹${plan.price.toLocaleString("en-IN")}` : "Contact us"}
+                      {(plan.id === "free" || plan.price > 0) && <small className="muted"> /{plan.price ? "30 days" : "forever"}</small>}
+                    </p>
+                    <p className="muted">{plan.note}</p>
+                    <ul>
+                      {[`${limit.codes.toLocaleString()} QR codes`, `${limit.systems} business ${limit.systems === 1 ? "system" : "systems"}`, `${limit.records.toLocaleString()} records`, "Analytics, API and webhooks", "Team roles and audit log"].map((line) => (
+                        <li key={line}>
+                          <Check size={16} /> {line}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link className={`button ${plan.id === "pro" ? "primary" : ""}`} href="/register">
+                      Start free
+                    </Link>
+                  </article>
+                </Reveal>
+              );
+            })}
           </div>
-          <p className="pricing-note">
-            Paid plans use manual renewal for each 30-day period. No automatic
-            recurring charge.
-          </p>
         </section>
-        <section className="final-cta">
-          <QrCode size={32} />
-          <h2>What will you connect next?</h2>
-          <p>Make your first QR code in your own workspace.</p>
-          <Link className="button primary" href="/register">
-            Get started free <ArrowRight size={17} />
-          </Link>
+
+        <section className="site-section" style={{ paddingTop: 0 }}>
+          <Reveal>
+            <div className="cta">
+              <h2>Make your first code in a minute</h2>
+              <p>Free to start. Change the destination whenever you need.</p>
+              <Link className="button large" href="/register">
+                Get started free <ArrowRight size={17} />
+              </Link>
+            </div>
+          </Reveal>
         </section>
       </main>
-      <footer className="marketing-footer">
-        <Link className="brand" href="/">
-          QR Manager
-        </Link>
-        <p>Every code. Every connection.</p>
-        <Link href="/login">Open your workspace</Link>
+      <footer className="site-footer">
+        <span>
+          © {new Date().getFullYear()} {BRAND}
+        </span>
+        <span className="row-actions">
+          <Link href="/login">Sign in</Link>
+          <Link href="/register">Create account</Link>
+        </span>
       </footer>
-    </div>
+    </>
   );
 }

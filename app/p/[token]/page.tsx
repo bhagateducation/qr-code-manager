@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { BRAND } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const metadata = {
-  title: "Public record | QR Manager",
+  title: "Public record",
   robots: { index: false, follow: false },
 };
 
@@ -42,7 +43,7 @@ export default async function PublicRecordPage({ params }: { params: Promise<{ t
             );
           })}
         </div>
-        <small className="muted">Powered by QR Manager</small>
+        <small className="muted">Powered by {BRAND}</small>
       </div>
     </main>
   );

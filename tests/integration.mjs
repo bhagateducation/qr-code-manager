@@ -367,4 +367,63 @@ check(
   ).status === 200,
   "new password accepted",
 );
+
+// --- Deletes, roles, analytics, API keys and two-step sign-in (tenant B's session is still valid) ---
+const act = (action, data, id, who = rb.cookie) => request("/api/workspace", { action, data, id }, who);
+const fresh = (await request("/api/auth/login", { email: a.email, password: `${password}X` })).cookie;
+const bQr = (await act("qr.create", { title: "B QR", targetUrl: "https://example.com/b" })).data.entity;
+check((await act("qr.delete", undefined, bQr.id, fresh)).status === 404, "tenant A cannot delete tenant B code");
+check((await act("qr.delete", undefined, bQr.id)).status === 200, "owner deletes own code");
+check((await request(`/s/${bQr.shortCode}`)).status === 404, "deleted code no longer resolves");
+const bSystem = (await act("system.create", { name: "B System", description: "", fields: [{ key: "note", label: "Note", type: "text", isRequired: false }] })).data.entity;
+const bRecord = (await act("record.create", { systemId: bSystem.id, title: "B Record", data: { note: "x" } })).data.entity;
+check((await act("record.delete", undefined, bRecord.id, fresh)).status === 404, "tenant A cannot delete tenant B record");
+check((await act("system.delete", undefined, bSystem.id, fresh)).status === 404, "tenant A cannot delete tenant B system");
+check((await act("record.delete", undefined, bRecord.id)).status === 200, "record delete");
+check((await act("system.delete", undefined, bSystem.id)).status === 200, "system delete");
+check((await request("/api/workspace/analytics?days=7")).status === 401, "anonymous analytics denied");
+const report = await request("/api/workspace/analytics?days=7&offset=330", undefined, rb.cookie);
+check(report.status === 200 && report.data.daily.length === 7 && report.data.heat.length === 84, "analytics report shape");
+check((await act("webhook.create", { url: "https://example.com/hook", events: ["record.updated"] })).status === 400, "unsupported webhook event rejected");
+check((await act("webhook.create", { url: "http://127.0.0.1/hook", events: ["scan.created"] })).status === 400, "private webhook address rejected");
+const key = await act("apiKey.create", { label: "QA key" });
+check(key.status === 200 && key.data.oneTimeSecret.startsWith("qrm_live_"), "owner creates API key");
+const viaKey = await fetch(`${base}/api/v1/qr`, { headers: { "x-api-key": key.data.oneTimeSecret } });
+check(viaKey.status === 200, "API key reads its workspace");
+check((await act("apiKey.revoke", undefined, key.data.entity.id)).status === 200, "API key revoke");
+check((await fetch(`${base}/api/v1/qr`, { headers: { "x-api-key": key.data.oneTimeSecret } })).status === 401, "revoked API key denied");
+const invite = await act("team.invite", { email: `qa-v-${suffix}@example.com`, role: "viewer" });
+const viewer = await request("/api/auth/invite/accept", { token: invite.data.oneTimeSecret, name: "QA Viewer", password });
+check(viewer.status === 200 && viewer.cookie, "invitation accepted");
+check((await act("qr.create", { title: "No", targetUrl: "https://example.com/no" }, undefined, viewer.cookie)).status === 403, "viewer cannot write");
+check((await request("/api/account/mfa", { action: "setup" }, viewer.cookie)).status === 200, "viewer can protect own account with MFA");
+check((await act("team.role", { role: "editor" }, viewer.data?.id || "x", viewer.cookie)).status === 403, "viewer cannot change roles");
+const members = (await request("/api/workspace", undefined, rb.cookie)).data.members;
+const viewerId = members.find((member) => member.role === "viewer").id;
+check((await act("team.role", { role: "editor" }, viewerId)).status === 200, "owner promotes viewer to editor");
+check((await act("apiKey.create", { label: "Editor key" }, undefined, viewer.cookie)).status === 403, "editor cannot create API keys");
+check((await act("webhook.create", { url: "https://example.com/hook", events: ["scan.created"] }, undefined, viewer.cookie)).status === 403, "editor cannot create webhooks");
+check((await request("/api/platform", { id: "x", plan: "business", days: 30 }, rb.cookie)).status === 403, "non-admin cannot grant plans");
+const { createHmac } = await import("node:crypto");
+const totp = (secret) => {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const c of secret) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  const keyBytes = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeUInt32BE(Math.floor(Date.now() / 30000), 4);
+  const digest = createHmac("sha1", keyBytes).update(counter).digest();
+  const offset = digest[19] & 15;
+  return ((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, "0");
+};
+const setup = await request("/api/account/mfa", { action: "setup" }, rb.cookie);
+const enabled = await request("/api/account/mfa", { action: "enable", secret: setup.data.secret, code: totp(setup.data.secret) }, rb.cookie);
+check(enabled.status === 200 && enabled.data.backupCodes.length === 8, "MFA enabled with a valid code");
+check((await request("/api/auth/login", { email: b.email, password })).data.mfaRequired === true, "login asks for second step");
+check((await request("/api/auth/login", { email: b.email, password, mfaCode: "000000" })).status === 401, "wrong second-step code denied");
+const backup = enabled.data.backupCodes[0];
+check((await request("/api/auth/login", { email: b.email, password, mfaCode: backup })).status === 200, "backup code signs in");
+check((await request("/api/auth/login", { email: b.email, password, mfaCode: backup })).status === 401, "backup code is single-use");
+check((await request("/api/account/mfa", { action: "disable" }, rb.cookie)).status === 400, "MFA cannot be disabled without a code");
+check((await request("/api/account/mfa", { action: "disable", code: totp(setup.data.secret) }, rb.cookie)).status === 200, "MFA disabled with a valid code");
 console.log(`${passed} integration checks passed.`);

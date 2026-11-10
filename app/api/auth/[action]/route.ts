@@ -33,7 +33,7 @@ export async function POST(
     if (!["login", "register"].includes(action))
       throw new ApiError(404, "Not found.");
     const credentials = z
-      .object({ email, password: z.string().min(1).max(72), mfaCode: z.string().optional() })
+      .object({ email, password: z.string().min(1).max(72), mfaCode: z.string().max(20).optional() })
       .parse(input);
     await rateLimit(`auth:${credentials.email}`, 10);
     await rateLimit("auth:global", 500, 60);
@@ -83,7 +83,12 @@ export async function POST(
         throw new ApiError(403, "Verify your email address before signing in.");
       if (user.mfaEnabled) {
         if (!credentials.mfaCode) return json({ mfaRequired: true });
-        if (!user.mfaSecret || !verifyTotp(user.mfaSecret, credentials.mfaCode))
+        const code = credentials.mfaCode.trim().toUpperCase();
+        const backups = Array.isArray(user.backupCodes) ? (user.backupCodes as string[]) : [];
+        if (backups.includes(code))
+          // Backup codes are single-use.
+          await prisma.user.update({ where: { id: user.id }, data: { backupCodes: backups.filter((item) => item !== code) } });
+        else if (!user.mfaSecret || !verifyTotp(user.mfaSecret, code))
           throw new ApiError(401, "Invalid authenticator code.");
       }
     }
