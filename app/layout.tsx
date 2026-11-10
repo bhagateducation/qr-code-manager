@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
-// Runs before first paint so a saved theme never flashes the default one.
-const themeScript = `try{var d=document.documentElement,s=localStorage;d.dataset.theme=s.getItem("qrm-theme")||"violet";d.dataset.mode=s.getItem("qrm-mode")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}`;
+// Runs before first paint so a saved theme never flashes the default one. Light is the default; dark is opt-in.
+const themeScript = `try{var d=document.documentElement,s=localStorage;d.dataset.theme=s.getItem("qrm-theme")||"violet";d.dataset.mode=s.getItem("qrm-mode")||"light"}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -1,6 +1,6 @@
 # QR Manager deployment runbook
 
-Status: commercial branch deployed to the temporary Hostinger origin below. Keep the original static demo backup separate and never upload the old root `qr-code-manager-hostinger.zip`.
+Status: version 2.1.0 (branch `claude/redesign-commercial`) is live on the temporary Hostinger origin below, and Hostinger rebuilds it on every push to that branch. Keep the original static demo backup separate and never upload the old root `qr-code-manager-hostinger.zip`.
 
 ## Intended public routes
 
@@ -34,7 +34,7 @@ Run `npm run release` to create a clean source directory at `release/qr-manager`
 
 ## Upgrading an existing database
 
-Migration `202611100001_numbering_trash` adds QR numbers and the trash. It numbers existing codes in creation order with a window function, so it needs MySQL 8 or MariaDB 10.2 or newer. It has only been run on the local test database, not on MySQL: back up the database before the first build that applies it.
+Migration `202611100001_numbering_trash` adds QR numbers and the trash. It numbers existing codes in creation order with a window function, so it needs MySQL 8 or MariaDB 10.2 or newer. It was applied successfully to the live Hostinger MySQL database on 2026-11-10. On any other existing database, back up before the first build that applies it.
 
 ## Owner bootstrap
 
