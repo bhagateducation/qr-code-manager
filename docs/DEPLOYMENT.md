@@ -26,13 +26,11 @@ The temporary Hostinger origin is confirmed live; attach the final custom domain
 
 ## Build and database
 
-Use `npm ci` including development dependencies for the build. Run `npm run db:migrate` against the new database, then `npm run build`. The build generates the MySQL Prisma client and uses Next.js standalone output. Do not reuse the local SQLite-generated client. Do not expose database setup/migration endpoints over HTTP.
-
-If Hostinger supports only a build hook for migrations, configure a separate explicit deployment script (`prisma migrate deploy && prisma generate && next build --webpack`) after verifying database connectivity. Normal `build` intentionally does not modify a database.
+Use `npm ci` including development dependencies for the build. `npm run build` generates the MySQL Prisma client, applies pending migrations (`prisma migrate deploy`) and produces Next.js standalone output, so the database must be reachable during the build. Do not reuse the local SQLite-generated client. Do not expose database setup/migration endpoints over HTTP.
 
 For a generic Node host, copy `.next/static` into `.next/standalone/.next/static` and start the generated `server.js`; use the platform's built-in Next adapter on Hostinger. Listen on its supplied `PORT`. Preserve no-store semantics on authenticated/API/resolver responses; never add blanket HTML caching.
 
-Run `node scripts/prepare-release.mjs` to create a clean source directory for Hostinger's deploy tool. The script copies only application/config/schema/bootstrap files, excluding local secrets, test DBs, dependencies, built assets and all legacy HTML/demo JS/ZIP files. Point the Hostinger deploy operation at that directory with type `nodejs`, appType `next`, nodeVersion `22` or `24`, and buildScript `build` after migrations are applied.
+Run `npm run release` to create a clean source directory at `release/qr-manager` for Hostinger's deploy tool. The script copies only application/config/schema/bootstrap files, excluding local secrets, test databases, dependencies, tests and built assets. Point the Hostinger deploy operation at that directory with type `nodejs`, appType `next`, nodeVersion `22` or `24`, and buildScript `build`.
 
 ## Owner bootstrap
 
@@ -48,7 +46,7 @@ Current billing is **manual 30-day renewal**, not Razorpay automatic subscriptio
 
 ## Final acceptance
 
-Poll deployment until completed or failed. Then check actual page content and `/api/health`, create two disposable customers, verify tenant isolation against MySQL, test real QR scan/target edit/pause, check cookie flags, verify logout/password revocation, test mobile/keyboard UI, confirm all local fonts load, exercise Razorpay test mode, verify old PHP/demo endpoints are gone, and test database backup restore. HTTP 200 or a successful local build alone is not acceptance.
+Poll deployment until completed or failed. Then check actual page content and `/api/health`, create two disposable customers, verify tenant isolation against MySQL, test real QR scan/target edit/pause, check cookie flags, verify logout/password revocation, test mobile/keyboard UI, exercise Razorpay test mode, and test database backup restore. HTTP 200 or a successful local build alone is not acceptance.
 
 ## Rollback and operations
 

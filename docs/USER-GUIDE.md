@@ -1,19 +1,39 @@
-# QR Manager usage
+# QR Manager user guide
 
-## Customer workflow
-1. Register with name, email, workspace name and a password of at least 12 characters. This creates an independent Free workspace.
-2. Open QR codes, choose Create QR code, enter its name and a public HTTP(S) destination, then Save & generate QR.
-3. The preview is decoded and checked against its expected link. Download PNG or vector SVG. Preserve the white margin around the code.
-4. Editing the destination keeps the same short link, so an existing print continues to work. Pause/Resume controls whether it redirects. Optional iOS and Android links override the main destination for those devices; expiry is entered in UTC.
-5. Create a business system with text, number, date, URL and boolean fields. Add or edit records; required fields and value types are checked on the server.
-6. Scan activity shows real events and inferred browser/device information. Export shown scans downloads the latest displayed 100 events; it is not an all-time export.
-7. Settings renames the workspace and changes the account password. Changing password signs out other sessions. Sign out revokes the current session.
+## For a customer
+
+1. **Sign up** with your name, business name, email and a password of at least 12 characters. You get your own Free workspace.
+2. **Create a QR code.** Choose *Create QR code*, pick a type, name it and save.
+   - *Website link* codes are dynamic: the printed code never changes and you can edit where it leads. They also support separate iPhone and Android destinations and an end date.
+   - *Contact card*, *Wi-Fi* and *Plain text* codes store their content inside the code, so reprint after editing them.
+3. **Download** the PNG or SVG. Every image is decoded and checked before the buttons are enabled. Keep the white margin when printing.
+4. **Organise** codes with tags and campaigns. Pause a code to stop it working without deleting it. Deleting removes the code and its scan history for good.
+5. **Systems & records** are your own tables (products, assets, members). Publish a record to get a read-only public page, then point a website link code at that page.
+6. **Analytics** shows scans per day, top codes, operating systems, browsers and busiest hours for today, 7, 30 or 90 days. *Export all scans* downloads a CSV.
+7. **Team.** The owner invites people as admin, editor or viewer. If email delivery is not configured, copy the invitation link shown on screen and send it yourself.
+8. **Settings.** Rename the workspace, change your password (this signs out your other devices) and turn on two-step sign-in. Keep the eight backup codes; each works once if you lose your phone.
+9. **Appearance.** The sun or moon button in the top bar switches accent colour and light or dark mode. The choice is saved in that browser.
 
 ## Plans
-Free: 10 QR codes, 1 system, 50 records. Pro: ₹499 per 30 days, 500 QR codes, 10 systems, 5,000 records. Business: ₹1,499 per 30 days, 2,500 QR codes, 50 systems, 25,000 records. Paid checkout is unavailable until Razorpay configuration is complete. On expiry, creation quotas return to Free; saved records are retained and existing QR resolution continues unless paused/expired/suspended.
 
-## Platform owner
-Use the same `/dashboard` login. A privately provisioned platform role reveals Platform controls. The owner can see the latest 100 workspaces and suspend/restore them; suspension disables login and QR resolution. A normal customer workspace owner cannot access this API. The owner cannot suspend their own workspace through this screen.
+| Plan | QR codes | Systems | Records |
+| --- | --- | --- | --- |
+| Free | 10 | 1 | 50 |
+| Pro | 500 | 10 | 5,000 |
+| Business | 2,500 | 50 | 25,000 |
 
-## Scope limits
-Team invitations, email verification/recovery, MFA, native Wi-Fi/vCard/plain-text payloads and public record pages are implemented in the application. Configure the transactional email provider before enforcing verification. QR code and scan CSV exports are available from the panel. Template installation, PDF exports and advanced automations remain pending; do not treat legacy demo screenshots or claims as implemented behavior.
+Paid plans last 30 days and do not renew automatically. When a plan ends, limits return to Free. Nothing is deleted and existing codes keep working; you only cannot create beyond the Free limits.
+
+## For developers
+
+- **API keys** (owner or admin): send the key in an `x-api-key` header to `GET /api/v1/qr` and `POST /api/v1/qr`. The key is shown once.
+- **Webhooks** (owner or admin): add a public HTTPS endpoint to receive a `scan.created` event on every scan. Verify it by computing HMAC-SHA256 of the raw body with your signing secret and comparing with the `X-QR-Manager-Signature` header.
+
+## For the platform owner
+
+Sign in at the same `/dashboard`. The **Clients** entry appears only for the platform owner account created by `scripts/bootstrap.mjs`.
+
+- Search clients by workspace name or owner email.
+- **Set plan** grants Free, Pro or Business for a number of days. Use it when a client pays you directly.
+- **Suspend** signs out the client's members and stops all of that workspace's codes from redirecting. **Restore** reverses it.
+- Each action is written to your audit log.

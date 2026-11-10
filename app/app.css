@@ -490,7 +490,8 @@ pre.snippet { margin: 0; padding: 12px 14px; border-radius: var(--r); background
   .topbar { padding: 10px 16px; }
   .content { padding: 18px 16px 32px; }
   .two-col, .studio-grid, .hero { grid-template-columns: 1fr; }
-  .qr-preview { position: static; order: -1; }
+  .qr-preview { position: static; }
+  .qr-preview.ready { order: -1; } /* a finished code leads on small screens; an empty preview does not push the form down */
   .features-grid, .plans-grid { grid-template-columns: 1fr; }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .site-nav nav { display: none; }
@@ -596,3 +597,5 @@ button.stat:hover { border-color: color-mix(in srgb, var(--tone, var(--accent)) 
   .welcome .button { flex: 1; }
   .page-icon { width: 40px; height: 40px; border-radius: 13px; }
 }
+.cta { background: linear-gradient(120deg, color-mix(in srgb, var(--primary) 96%, #000), color-mix(in srgb, var(--primary) 70%, #2563eb) 60%, color-mix(in srgb, var(--primary) 60%, #db2777)); box-shadow: 0 18px 40px color-mix(in srgb, var(--primary) 28%, transparent); }
+.hero { overflow-x: clip; } /* the card glow must not widen the page on phones */

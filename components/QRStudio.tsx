@@ -296,7 +296,7 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
           )}
         </form>
 
-        <div className="panel qr-preview">
+        <div className={`panel qr-preview ${image ? "ready" : ""}`}>
           <div className="preview-frame">
             {image ? (
               <motion.img key={image} src={image} width={256} height={256} alt={`QR code for ${title}`} initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }} />

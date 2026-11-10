@@ -210,7 +210,7 @@ export function ThemeControl() {
     </>
   );
   return (
-    <div className="popover-wrap" onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setOpen(false)}>
+    <div className="popover-wrap" onKeyDown={(event) => event.key === "Escape" && setOpen(false)} onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setOpen(false)}>
       <button type="button" className="icon-button" aria-label="Theme and appearance" aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? <Palette size={18} /> : mode === "dark" ? <Moon size={18} /> : <Sun size={18} />}
       </button>

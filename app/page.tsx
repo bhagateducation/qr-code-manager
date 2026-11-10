@@ -7,14 +7,14 @@ import Reveal from "@/components/Reveal";
 import { ThemeControl } from "@/components/ui";
 
 const features = [
-  { icon: RefreshCw, title: "Change the link, keep the print", text: "Every website code is dynamic. Update its destination, pause it or set an end date without reprinting anything." },
-  { icon: QrCode, title: "Four code types", text: "Website links, Wi-Fi access, contact cards and plain text. Each download is scan-tested before you get it, as PNG or vector SVG." },
-  { icon: Smartphone, title: "Route by device", text: "Send iPhone users to the App Store, Android users to Google Play and everyone else to your site, from one code." },
-  { icon: Layers, title: "Records with public pages", text: "Build your own tables for products, assets or members, then publish any record as a page a QR code can open." },
-  { icon: BarChart3, title: "Scan analytics", text: "See scans per day, busiest hours, devices and your top codes. Export everything to CSV." },
-  { icon: Users, title: "Built for teams", text: "Invite teammates as admin, editor or viewer. Every change is written to an audit log." },
-  { icon: Code2, title: "API and webhooks", text: "Create codes from your own software and receive a signed event the moment a code is scanned." },
-  { icon: ShieldCheck, title: "Secure by default", text: "Two-step sign-in, hashed sessions and keys, and strict separation between workspaces." },
+  { icon: RefreshCw, tone: "#6b54d8", title: "Change the link, keep the print", text: "Every website code is dynamic. Update its destination, pause it or set an end date without reprinting anything." },
+  { icon: QrCode, tone: "#2563eb", title: "Four code types", text: "Website links, Wi-Fi access, contact cards and plain text. Each download is scan-tested before you get it, as PNG or vector SVG." },
+  { icon: Smartphone, tone: "#db2777", title: "Route by device", text: "Send iPhone users to the App Store, Android users to Google Play and everyone else to your site, from one code." },
+  { icon: Layers, tone: "#7c3aed", title: "Records with public pages", text: "Build your own tables for products, assets or members, then publish any record as a page a QR code can open." },
+  { icon: BarChart3, tone: "#059669", title: "Scan analytics", text: "See scans per day, busiest hours, devices and your top codes. Export everything to CSV." },
+  { icon: Users, tone: "#ea580c", title: "Built for teams", text: "Invite teammates as admin, editor or viewer. Every change is written to an audit log." },
+  { icon: Code2, tone: "#0d9488", title: "API and webhooks", text: "Create codes from your own software and receive a signed event the moment a code is scanned." },
+  { icon: ShieldCheck, tone: "#475569", title: "Secure by default", text: "Two-step sign-in, hashed sessions and keys, and strict separation between workspaces." },
 ];
 const steps = [
   ["Create a workspace", "Sign up free in under a minute."],
@@ -129,7 +129,7 @@ export default async function Home() {
           <div className="features-grid four">
             {features.map((feature, index) => (
               <Reveal key={feature.title} delay={(index % 4) * 0.06}>
-                <article className="panel feature-card" style={{ height: "100%" }}>
+                <article className="panel feature-card" style={{ height: "100%", "--tone": feature.tone } as React.CSSProperties}>
                   <feature.icon />
                   <h3>{feature.title}</h3>
                   <p>{feature.text}</p>

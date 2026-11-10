@@ -1,33 +1,60 @@
 # QR Manager
 
-Next.js / React / TypeScript foundation for a public QR SaaS, using Prisma and MySQL. One authenticated panel at `/dashboard`, with separate server-side platform-owner permissions. Roboto Slab headings and Poppins body/UI fonts are served locally.
+A multi-tenant QR code SaaS: dynamic QR codes, custom business records with public pages, scan analytics, teams, API keys, webhooks and Razorpay billing. Built with Next.js (App Router), React, TypeScript, Prisma and MySQL.
 
-**Status:** working local foundation, not yet a fully commercial-ready or live-verified release. The original root HTML/JS/ZIP and `components/dashboard`/`components/ui` are legacy demo references. They are not imported by the new application and are excluded from the clean release directory. Never deploy the old static ZIP.
+Each customer signs up into their own workspace. One platform owner account sees every workspace in a **Clients** panel and can suspend a client or grant a plan by hand.
 
-## Documents
+## Run locally
 
-- [Audit, evidence and pending features](docs/AUDIT-2026-10-31.md)
-- [Source inventory](docs/BASELINE-INVENTORY.csv)
-- [Deployment and owner bootstrap](docs/DEPLOYMENT.md)
-- [How each implemented feature works](docs/USER-GUIDE.md)
-- [Implementation plan](docs/IMPLEMENTATION-PLAN.md)
+```bash
+npm ci
+cp .env.example .env   # then fill in DATABASE_URL and APP_URL
+npm run db:migrate
+npm run dev
+```
 
-## Run
-
-Install with `npm ci`. Create a private `.env` based on `.env.example` using a dedicated MySQL database. Run `npm run db:migrate`, `npm run db:generate`, then `npm run dev`. Never commit credentials. `npm run build` generates the MySQL client and a Next.js standalone build; it deliberately does not run migrations.
+`APP_URL` must be the exact origin you open in the browser (for example `http://localhost:3000`); write requests from any other origin are refused.
 
 ## Checks
 
-- `npm test`: validation, payment-signature and QR decode/vector tests.
-- `npm run lint`: TypeScript.
-- `node tests/integration.mjs`: local HTTP acceptance suite; creates disposable test workspaces. Requires a running locally configured app and test database.
-- `npm audit`: dependency advisories.
-- `node scripts/prepare-release.mjs`: writes a clean source directory under `release/`, excluding secrets, tests, demo files, build output and dependencies.
+| Command | What it covers |
+| --- | --- |
+| `npm run lint` | TypeScript |
+| `npm test` | Validation, payment signatures, QR decode for every colour and correction level |
+| `node tests/integration.mjs` | 77 HTTP checks against a running local server: auth, tenant isolation, roles, deletes, quotas, API keys, two-step sign-in, billing forgery. Creates disposable accounts, so never point it at production. |
 
-Do not point the integration suite at production. Local tests used SQLite with the same Prisma model; the production schema is MySQL and still needs live acceptance.
+## Structure
 
-## Implementation structure
+| Path | Purpose |
+| --- | --- |
+| `app/app.css` | The whole design system. Colours are tokens, so the four accent themes and dark mode apply everywhere. |
+| `components/Dashboard.tsx` | Panel shell: navigation rail, top bar, toasts, confirm dialog. |
+| `components/ui.tsx` | Shared types, `api()` helper, modal, theme control, motion presets. |
+| `components/Overview.tsx`, `QRCodes.tsx`, `QRStudio.tsx`, `Systems.tsx`, `Analytics.tsx` | Workspace views. |
+| `components/Connect.tsx` | Tags, campaigns, webhooks, API keys. |
+| `components/Workspace.tsx` | Team, billing, audit log, settings, help, clients (platform owner). |
+| `app/api/workspace` | Every workspace read and write, scoped by the signed-in user's workspace. |
+| `app/api/platform` | Platform owner: list, suspend and set the plan of client workspaces. |
+| `app/s/[code]` | Public scan resolver. Logs the scan, then redirects. Webhooks fire after the response. |
+| `app/api/v1/qr` | Public API, authenticated with an `x-api-key` header. |
+| `lib/brand.ts` | Product name and support email, set with `NEXT_PUBLIC_BRAND_NAME` and `NEXT_PUBLIC_SUPPORT_EMAIL`. |
 
-`app/api/auth` and `lib/auth.ts`: credential verification and revocable sessions. `app/api/workspace`: scoped QR/system/record writes with quota enforcement. `app/s/[code]`: public resolver and scan events. `app/api/billing`: Razorpay order/signature/captured-payment handling. `app/api/platform`: owner workspace controls. `components/Dashboard.tsx`, `QRStudio.tsx`, `Systems.tsx`: unified working panel. `prisma/migrations`: initial MySQL schema.
+## Roles
 
-Paid plans are Pro ₹499 and Business ₹1,499 for 30 days with manual renewal. Razorpay must be configured and tested before activation. Password recovery, email verification, MFA and native Wi-Fi/vCard/plain-text QR payloads are implemented; provider configuration, legal pages and operational launch gates remain documented in the audit.
+| Role | Can do |
+| --- | --- |
+| Owner | Everything, including billing, team and workspace settings |
+| Admin | Content, plus API keys and webhooks |
+| Editor | Create and edit codes, systems, records, tags and campaigns |
+| Viewer | View and download only |
+
+## Before you sell it
+
+These need your own accounts or decisions and are not done by the code:
+
+1. A MySQL database and the environment values in `.env.example`.
+2. Razorpay keys and webhook secret. Until they are set, checkout is off and plans can only be granted from the Clients panel.
+3. A Resend API key if you want password-reset, verification and invitation emails to be delivered. Without it, invitation links are shown to the owner to copy.
+4. Terms, privacy and refund pages.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
