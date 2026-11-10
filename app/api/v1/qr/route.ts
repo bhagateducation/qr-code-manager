@@ -9,10 +9,10 @@ export async function GET(request: NextRequest) {
     const key = await authorizeApiKey(request);
     const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("limit")) || 25));
     const qrs = await prisma.qRCode.findMany({
-      where: { workspaceId: key.workspaceId },
+      where: { workspaceId: key.workspaceId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: { id: true, title: true, type: true, shortCode: true, targetUrl: true, isActive: true, scanCount: true, campaign: { select: { id: true, name: true } }, tags: { include: { tag: { select: { id: true, name: true, color: true } } } }, createdAt: true, updatedAt: true },
+      select: { id: true, number: true, title: true, type: true, shortCode: true, targetUrl: true, isActive: true, scanCount: true, campaign: { select: { id: true, name: true } }, tags: { include: { tag: { select: { id: true, name: true, color: true } } } }, createdAt: true, updatedAt: true },
     });
     return json({ data: qrs });
   } catch (error) {
@@ -33,13 +33,14 @@ export async function POST(request: NextRequest) {
       throw new ApiError(400, "A QR cannot redirect to another QR resolver on this site.");
     const workspace = await prisma.workspace.findUnique({ where: { id: key.workspaceId } });
     if (!workspace || workspace.suspended) throw new ApiError(403, "This workspace is suspended.");
-    if (await prisma.qRCode.count({ where: { workspaceId: key.workspaceId } }) >= limits[effectivePlan(workspace)].codes)
+    if (await prisma.qRCode.count({ where: { workspaceId: key.workspaceId, deletedAt: null } }) >= limits[effectivePlan(workspace)].codes)
       throw new ApiError(409, "Your plan QR limit has been reached.");
     if (campaignId && !(await prisma.campaign.findFirst({ where: { id: campaignId, workspaceId: key.workspaceId } })))
       throw new ApiError(404, "Campaign not found.");
     const tags = tagIds.length ? await prisma.tag.findMany({ where: { id: { in: tagIds }, workspaceId: key.workspaceId }, select: { id: true } }) : [];
     if (tags.length !== new Set(tagIds).size) throw new ApiError(404, "One or more tags were not found.");
-    const qr = await prisma.qRCode.create({ data: { ...qrData, workspaceId: key.workspaceId, campaignId: campaignId || null, shortCode: randomBytes(9).toString("base64url"), tags: { create: tagIds.map((tagId) => ({ tagId })) } }, include: { tags: { include: { tag: true } }, campaign: true } });
+    // Take the next number and create the code together so two API calls can never share a number.
+    const qr = await prisma.$transaction(async (tx) => tx.qRCode.create({ data: { ...qrData, number: (await tx.workspace.update({ where: { id: key.workspaceId }, data: { qrSeq: { increment: 1 } } })).qrSeq, workspaceId: key.workspaceId, campaignId: campaignId || null, shortCode: randomBytes(9).toString("base64url"), tags: { create: tagIds.map((tagId) => ({ tagId })) } }, include: { tags: { include: { tag: true } }, campaign: true } }));
     return json({ data: qr }, 201);
   } catch (error) {
     return failure(error);

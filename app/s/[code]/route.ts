@@ -23,7 +23,7 @@ export async function GET(
       where: { shortCode: code },
       include: { workspace: { select: { suspended: true } } },
     });
-    if (!qr) return message("QR code not found.", 404);
+    if (!qr || qr.deletedAt) return message("QR code not found.", 404);
     const rules = (qr.routingRules || {}) as {
       ios?: string;
       android?: string;

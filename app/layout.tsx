@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/bricolage-grotesque";
 import "./app.css";
 import { BRAND } from "@/lib/brand";
 

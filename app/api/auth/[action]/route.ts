@@ -12,6 +12,8 @@ import {
   hashPassword,
   verifyPassword,
   revokeSession,
+  revokeOtherSessions,
+  getSessionUser,
 } from "@/lib/auth";
 import { verifyTotp } from "@/lib/mfa";
 import { emailDeliveryConfigured, sendEmailVerificationEmail } from "@/lib/email";
@@ -29,6 +31,11 @@ export async function POST(
       const response = json({ ok: true });
       response.cookies.set(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 });
       return response;
+    }
+    if (action === "logout-others") {
+      const current = await getSessionUser();
+      if (!current) throw new ApiError(401, "Sign in to continue.");
+      return json({ ok: true, ended: (await revokeOtherSessions(current.id)).count });
     }
     if (!["login", "register"].includes(action))
       throw new ApiError(404, "Not found.");

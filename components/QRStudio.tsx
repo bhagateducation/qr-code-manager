@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle2, Contact, Download, Link2, QrCode, Trash2, Type, Wifi } from "lucide-react";
 import { buildVCardPayload, buildWifiPayload, QRType } from "@/lib/qr-payload";
-import { CopyButton, Ctx, QR, saveFile } from "./ui";
+import { CopyButton, Ctx, QR, qrNumber, saveFile } from "./ui";
 
 type Styling = { dark: string; light: string; errorCorrectionLevel: "L" | "M" | "Q" | "H" };
 const types: { id: QRType; label: string; icon: typeof Link2 }[] = [
@@ -120,7 +120,7 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
     }
   }
   async function remove() {
-    if (saved && (await ask({ title: `Delete “${saved.title}”?`, body: "Printed copies of this code will stop working and its scan history is removed. This cannot be undone.", action: "Delete code" })))
+    if (saved && (await ask({ title: `Move “${saved.title}” to the trash?`, body: "It stops working when scanned. You can restore it from the trash for 30 days.", action: "Move to trash" })))
       await mutate("qr.delete", undefined, saved.id).then(onClose, () => {});
   }
 
@@ -133,11 +133,11 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
         <form className="panel stack" onSubmit={submit}>
           <div className="panel-heading" style={{ marginBottom: 0 }}>
             <div>
-              <h1>{saved ? "Edit QR code" : "New QR code"}</h1>
+              <h1>{saved ? `Edit ${qrNumber(saved.number)}` : "New QR code"}</h1>
               <p className="muted">{qrType === "dynamic_url" ? "The printed code never changes. You can update where it leads at any time." : "This content is stored inside the code itself, so reprint it after changes."}</p>
             </div>
             {saved && canWrite && (
-              <button type="button" className="icon-button danger" aria-label="Delete this code" title="Delete" onClick={remove}>
+              <button type="button" className="icon-button danger" aria-label="Move this code to the trash" title="Move to trash" onClick={remove}>
                 <Trash2 size={17} />
               </button>
             )}

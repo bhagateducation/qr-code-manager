@@ -5,6 +5,8 @@ import { Check, Copy, Moon, Palette, Sun, X, type LucideIcon } from "lucide-reac
 
 export type QR = {
   id: string;
+  number: number;
+  deletedAt?: string | null;
   title: string;
   shortCode: string;
   targetUrl: string;
@@ -30,6 +32,9 @@ export type Data = {
   scans: number;
   active: number;
   recordCount: number;
+  codeCount: number;
+  trashCount: number;
+  pageSize: number;
   topCodes: { id: string; title: string; scanCount: number }[];
   limits: { codes: number; systems: number; records: number };
   appUrl: string;
@@ -46,6 +51,11 @@ export type Data = {
   webhookDeliveries: { id: string; eventType: string; status: string; responseCode: number | null; lastError: string | null; createdAt: string; webhook: { url: string } }[];
   invitations: { id: string; email: string; role: string; expiresAt: string }[];
 };
+/** How the QR list is narrowed and ordered. Sent to the server as query parameters. */
+export type Filters = { search: string; status: string; tag: string; campaign: string; type: string; sort: string; size: string };
+export const noFilters: Filters = { search: "", status: "", tag: "", campaign: "", type: "", sort: "", size: "25" };
+/** QR-00042: fixed width so numbers sort and scan well on printed lists. */
+export const qrNumber = (value: number) => `QR-${String(value).padStart(5, "0")}`;
 export type Ask = (options: { title: string; body: string; action: string; danger?: boolean }) => Promise<boolean>;
 /** Everything a panel needs from the shell. */
 export type Ctx = {

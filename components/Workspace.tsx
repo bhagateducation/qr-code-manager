@@ -182,7 +182,7 @@ export function Billing({ ctx }: { ctx: Ctx }) {
           </div>
         </div>
         <div className="three-col">
-          <Meter label="QR codes" used={data.total} limit={data.limits.codes} />
+          <Meter label="QR codes" used={data.codeCount} limit={data.limits.codes} />
           <Meter label="Systems" used={data.systems.length} limit={data.limits.systems} />
           <Meter label="Records" used={data.recordCount} limit={data.limits.records} />
         </div>
@@ -243,7 +243,13 @@ const actionLabels: Record<string, string> = {
   "qr.create": "Created a QR code",
   "qr.update": "Edited a QR code",
   "qr.pause": "Paused or resumed a QR code",
-  "qr.delete": "Deleted a QR code",
+  "qr.delete": "Moved a QR code to the trash",
+  "qr.bulk.pause": "Paused several QR codes",
+  "qr.bulk.resume": "Resumed several QR codes",
+  "qr.bulk.trash": "Moved QR codes to the trash",
+  "qr.bulk.restore": "Restored QR codes from the trash",
+  "qr.bulk.purge": "Permanently deleted QR codes",
+  "trash.empty": "Emptied the trash",
   "system.create": "Created a system",
   "system.delete": "Deleted a system",
   "record.create": "Added a record",
@@ -446,6 +452,23 @@ export function SettingsPanel({ ctx }: { ctx: Ctx }) {
           </button>
         </form>
         <Mfa ctx={ctx} />
+        <div className="panel stack">
+          <div>
+            <h2>Signed-in devices</h2>
+            <p className="muted">If you used a shared or lost device, end every session except this one.</p>
+          </div>
+          <button
+            className="button"
+            style={{ justifySelf: "start" }}
+            onClick={() =>
+              api("/api/auth/logout-others", {})
+                .then((result) => notify(result.ended ? `Signed out ${result.ended} other ${result.ended === 1 ? "device" : "devices"}.` : "No other devices were signed in."))
+                .catch((e) => notify(e.message, "error"))
+            }
+          >
+            Sign out other devices
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -455,7 +478,8 @@ const faq = [
   ["What is a dynamic QR code?", "The printed code holds a short permanent link. When someone scans it we forward them to your destination, which you can change at any time without reprinting."],
   ["Which QR types need a reprint after editing?", "Wi-Fi, contact card and plain text codes store their content inside the code itself, so the image changes when you edit them. Website link codes never change."],
   ["How do I send iPhone and Android users to different places?", "Open a website link code, expand “Device routing and expiry”, and add a separate address for each. Everyone else goes to the main destination."],
-  ["What happens when I pause or delete a code?", "A paused code shows an “unavailable” message when scanned and can be resumed. A deleted code and its scan history are removed permanently."],
+  ["What happens when I pause or delete a code?", "A paused code shows an “unavailable” message when scanned and can be resumed. A deleted code goes to the trash, where it can be restored for 30 days before it is removed for good."],
+  ["How do I find one code among thousands?", "Every code has its own number, such as QR-00042. Type the number, part of the name or part of the link into the search box, or press Ctrl K from anywhere. Filters narrow the list by status, type, campaign and tag."],
   ["How do public record pages work?", "In Systems & records, publish a record to get a read-only page. Create a website link QR code that points at that page to label a product, asset or member card."],
   ["Who can do what?", "Owners manage billing, team and settings. Admins also manage API keys and webhooks. Editors create and edit content. Viewers can only look and download."],
   ["Is scan data private?", "We record time, device type, operating system and browser. We do not store IP addresses or precise location."],

@@ -426,4 +426,33 @@ check((await request("/api/auth/login", { email: b.email, password, mfaCode: bac
 check((await request("/api/auth/login", { email: b.email, password, mfaCode: backup })).status === 401, "backup code is single-use");
 check((await request("/api/account/mfa", { action: "disable" }, rb.cookie)).status === 400, "MFA cannot be disabled without a code");
 check((await request("/api/account/mfa", { action: "disable", code: totp(setup.data.secret) }, rb.cookie)).status === 200, "MFA disabled with a valid code");
+
+// --- numbering, search, trash, bulk actions and session control ---
+const n1 = (await act("qr.create", { title: "Numbered one", targetUrl: "https://example.com/n1" })).data.entity;
+const n2 = (await act("qr.create", { title: "Numbered two", targetUrl: "https://example.com/n2" })).data.entity;
+check(n1.number > 0 && n2.number === n1.number + 1, "codes get consecutive numbers");
+const list = (query) => request(`/api/workspace?${query}`, undefined, rb.cookie);
+const byNumber = await list(`search=QR-${String(n2.number).padStart(5, "0")}`);
+check(byNumber.data.qrCodes.some((qr) => qr.id === n2.id), "search finds a code by its number");
+check((await list("search=example.com/n1")).data.qrCodes.some((qr) => qr.id === n1.id), "search finds a code by its destination");
+check((await list("sort=number&size=50")).data.pageSize === 50, "page size is honoured");
+check((await act("qr.bulk", { ids: [n1.id, n2.id], op: "trash" }, undefined, viewer.cookie)).status === 200, "editor moves codes to the trash");
+check(!(await list("")).data.qrCodes.some((qr) => qr.id === n1.id), "trashed code leaves the main list");
+const trash = await list("status=trash");
+check(trash.data.qrCodes.some((qr) => qr.id === n1.id) && trash.data.trashCount >= 2, "trashed code is listed in the trash");
+check((await request(`/s/${n1.shortCode}`)).status === 404, "trashed code does not resolve");
+check((await act("qr.update", { title: "x", targetUrl: "https://example.com/x" }, n1.id)).status === 404, "trashed code cannot be edited");
+check((await act("qr.bulk", { ids: [n1.id], op: "purge" }, undefined, viewer.cookie)).status === 403, "editor cannot delete permanently");
+check((await act("trash.empty", undefined, undefined, viewer.cookie)).status === 403, "editor cannot empty the trash");
+check((await act("qr.bulk", { ids: [n1.id], op: "restore" }, undefined, fresh)).status === 200 && (await request(`/s/${n1.shortCode}`)).status === 404, "another tenant cannot restore the code");
+check((await act("qr.bulk", { ids: [n1.id], op: "restore" })).status === 200, "owner restores from the trash");
+check((await request(`/s/${n1.shortCode}`)).status === 302, "restored code resolves again");
+check((await act("qr.bulk", { ids: [n2.id], op: "purge" })).status === 200 && !(await list("status=trash")).data.qrCodes.some((qr) => qr.id === n2.id), "owner deletes permanently");
+const n3 = (await act("qr.create", { title: "Numbered three", targetUrl: "https://example.com/n3" })).data.entity;
+check(n3.number === n2.number + 1, "a deleted number is never reused");
+check((await act("qr.bulk", { ids: [n1.id, n3.id], op: "pause" })).status === 200 && (await request(`/s/${n3.shortCode}`)).status === 410, "bulk pause stops codes resolving");
+check((await act("qr.bulk", { ids: Array.from({ length: 101 }, (_, i) => `id-${i}`), op: "pause" })).status === 400, "bulk actions are capped at 100 codes");
+const second = await request("/api/auth/login", { email: b.email, password });
+check((await request("/api/auth/logout-others", {}, second.cookie)).data.ended >= 1, "sign out other devices ends other sessions");
+check((await request("/api/workspace", undefined, rb.cookie)).status === 401 && (await request("/api/workspace", undefined, second.cookie)).status === 200, "only the current session survives");
 console.log(`${passed} integration checks passed.`);

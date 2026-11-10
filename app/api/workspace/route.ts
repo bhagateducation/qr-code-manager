@@ -37,10 +37,43 @@ export async function GET(request: NextRequest) {
       0,
       100,
     );
+    const params = request.nextUrl.searchParams;
+    const status = params.get("status");
+    const size = [25, 50, 100].includes(Number(params.get("size"))) ? Number(params.get("size")) : 25;
+    const live = { workspaceId, deletedAt: null };
+    const term = search.trim();
+    // "#42", "42" and "QR-00042" all find code number 42.
+    const number = /^(?:qr-?|#)?0*(\d{1,9})$/i.exec(term)?.[1];
     const where = {
       workspaceId,
-      ...(search ? { title: { contains: search } } : {}),
+      deletedAt: status === "trash" ? { not: null } : null,
+      ...(term
+        ? {
+            OR: [
+              ...(number ? [{ number: Number(number) }] : []),
+              { title: { contains: term } },
+              { shortCode: { contains: term } },
+              { targetUrl: { contains: term } },
+            ],
+          }
+        : {}),
+      ...(status === "active" ? { isActive: true } : status === "paused" ? { isActive: false } : {}),
+      ...(params.get("tag") ? { tags: { some: { tagId: params.get("tag")! } } } : {}),
+      ...(params.get("campaign") ? { campaignId: params.get("campaign")! } : {}),
+      ...(["dynamic_url", "wifi", "vcard", "text"].includes(params.get("type") || "") ? { type: params.get("type")! } : {}),
     };
+    const orderBy =
+      (
+        {
+          oldest: { createdAt: "asc" },
+          scans: { scanCount: "desc" },
+          name: { title: "asc" },
+          number: { number: "asc" },
+        } as const
+      )[params.get("sort") || ""] || ({ createdAt: "desc" } as const);
+    // Trash empties itself: anything binned more than 30 days ago is removed for good.
+    if (status === "trash")
+      await prisma.qRCode.deleteMany({ where: { workspaceId, deletedAt: { lt: new Date(Date.now() - 30 * 86400000) } } });
     const [
       qrCodes,
       total,
@@ -59,18 +92,20 @@ export async function GET(request: NextRequest) {
       invitations,
       topCodes,
       recordCount,
+      codeCount,
+      trashCount,
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
         include: { tags: { include: { tag: true } }, campaign: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * 25,
-        take: 25,
+        orderBy,
+        skip: (page - 1) * size,
+        take: size,
       }),
       prisma.qRCode.count({ where }),
-      prisma.qRCode.count({ where: { workspaceId, isActive: true } }),
+      prisma.qRCode.count({ where: { ...live, isActive: true } }),
       prisma.qRCode.aggregate({
-        where: { workspaceId },
+        where: live,
         _sum: { scanCount: true },
       }),
       prisma.system.findMany({
@@ -117,8 +152,10 @@ export async function GET(request: NextRequest) {
       prisma.apiKey.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, label: true, prefix: true, lastUsedAt: true, revokedAt: true, createdAt: true } }),
       prisma.webhookDelivery.findMany({ where: { webhook: { workspaceId } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, eventType: true, status: true, responseCode: true, attempts: true, lastError: true, createdAt: true, deliveredAt: true, webhook: { select: { url: true } } } }),
       prisma.invitation.findMany({ where: { workspaceId, acceptedAt: null }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, email: true, role: true, expiresAt: true, createdAt: true } }),
-      prisma.qRCode.findMany({ where: { workspaceId, scanCount: { gt: 0 } }, orderBy: { scanCount: "desc" }, take: 5, select: { id: true, title: true, scanCount: true } }),
+      prisma.qRCode.findMany({ where: { ...live, scanCount: { gt: 0 } }, orderBy: { scanCount: "desc" }, take: 5, select: { id: true, title: true, scanCount: true } }),
       prisma.record.count({ where: { system: { workspaceId } } }),
+      prisma.qRCode.count({ where: live }),
+      prisma.qRCode.count({ where: { workspaceId, deletedAt: { not: null } } }),
     ]);
     const plan = effectivePlan(user.workspace);
     const prices = {
@@ -156,6 +193,9 @@ export async function GET(request: NextRequest) {
       invitations,
       topCodes,
       recordCount,
+      codeCount,
+      trashCount,
+      pageSize: size,
       limits: limits[plan],
       prices,
       checkoutReady: !!(
@@ -238,12 +278,15 @@ export async function POST(request: NextRequest) {
           throw new ApiError(404, "One or more tags were not found.");
         if (input.action === "qr.create") {
           if (
-            (await tx.qRCode.count({ where: { workspaceId } })) >= quota.codes
+            (await tx.qRCode.count({ where: { workspaceId, deletedAt: null } })) >= quota.codes
           )
             throw new ApiError(409, "Your plan QR limit has been reached.");
+          // The workspace row is locked by this transaction, so numbers never repeat or skip under load.
+          const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
           entity = await tx.qRCode.create({
             data: {
               ...qrData,
+              number: qrSeq,
               campaignId: campaignId || null,
               workspaceId,
               shortCode: randomBytes(9).toString("base64url"),
@@ -254,7 +297,7 @@ export async function POST(request: NextRequest) {
           if (
             !input.id ||
             !(await tx.qRCode.findFirst({
-              where: { id: input.id, workspaceId },
+              where: { id: input.id, workspaceId, deletedAt: null },
             }))
           )
             throw new ApiError(404, "QR not found.");
@@ -273,7 +316,7 @@ export async function POST(request: NextRequest) {
       } else if (input.action === "qr.pause") {
         if (!input.id) throw new ApiError(400, "QR is required.");
         const qr = await tx.qRCode.findFirst({
-          where: { id: input.id, workspaceId },
+          where: { id: input.id, workspaceId, deletedAt: null },
         });
         if (!qr) throw new ApiError(404, "QR not found.");
         entity = await tx.qRCode.update({
@@ -282,8 +325,32 @@ export async function POST(request: NextRequest) {
         });
       } else if (input.action === "qr.delete") {
         if (!input.id) throw new ApiError(400, "QR is required.");
-        entity = await tx.qRCode.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        // Delete moves the code to the trash; it stops resolving but can be restored for 30 days.
+        entity = await tx.qRCode.updateMany({ where: { id: input.id, workspaceId, deletedAt: null }, data: { deletedAt: new Date() } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "QR not found.");
+      } else if (input.action === "qr.bulk") {
+        const data = z
+          .object({ ids: z.array(z.string().max(100)).min(1).max(100), op: z.enum(["pause", "resume", "trash", "restore", "purge"]) })
+          .parse(input.data);
+        const trashed = data.op === "restore" || data.op === "purge";
+        const scope = { id: { in: data.ids }, workspaceId, deletedAt: trashed ? { not: null } : null };
+        if (data.op === "purge") {
+          if (!["owner", "admin"].includes(user.role)) throw new ApiError(403, "Only owners and admins can delete permanently.");
+          await tx.qRCode.deleteMany({ where: scope });
+        } else {
+          if (data.op === "restore" && (await tx.qRCode.count({ where: { workspaceId, deletedAt: null } })) + (await tx.qRCode.count({ where: scope })) > quota.codes)
+            throw new ApiError(409, "Restoring these would go over your plan QR limit.");
+          await tx.qRCode.updateMany({
+            where: scope,
+            data: data.op === "pause" ? { isActive: false } : data.op === "resume" ? { isActive: true } : { deletedAt: data.op === "trash" ? new Date() : null },
+          });
+        }
+        input.action = `qr.bulk.${data.op}`;
+        entity = { id: workspaceId };
+      } else if (input.action === "trash.empty") {
+        if (!["owner", "admin"].includes(user.role)) throw new ApiError(403, "Only owners and admins can empty the trash.");
+        await tx.qRCode.deleteMany({ where: { workspaceId, deletedAt: { not: null } } });
+        entity = { id: workspaceId };
       } else if (input.action === "system.delete") {
         if (!input.id) throw new ApiError(400, "System is required.");
         entity = await tx.system.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));

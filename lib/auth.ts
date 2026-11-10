@@ -42,6 +42,11 @@ export async function getSessionUser() {
     return null;
   return session.user;
 }
+/** Ends every session of this user except the one making the request. */
+export async function revokeOtherSessions(userId: string) {
+  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  return prisma.session.deleteMany({ where: { userId, NOT: { tokenHash: digest(token || "") } } });
+}
 export async function revokeSession() {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (token)

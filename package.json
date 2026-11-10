@@ -15,6 +15,7 @@
     "release": "node scripts/prepare-release.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^14.9.0",

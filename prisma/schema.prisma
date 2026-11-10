@@ -14,6 +14,7 @@ model Workspace {
   plan        String       @default("free")
   paidUntil   DateTime?
   suspended   Boolean      @default(false)
+  qrSeq       Int          @default(0) // last QR number handed out in this workspace
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -128,6 +129,8 @@ model QRCode {
   styling      Json?      // fgColor, bgColor, pattern, corner, logo, frame
   scanCount    Int        @default(0)
   isActive     Boolean    @default(true)
+  number       Int        @default(0) // human-friendly number, unique per workspace
+  deletedAt    DateTime?  // set while the code sits in the trash
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -141,6 +144,8 @@ model QRCode {
   @@index([recordId])
   @@index([campaignId])
   @@index([shortCode])
+  @@unique([workspaceId, number])
+  @@index([workspaceId, deletedAt, createdAt])
   @@map("qr_codes")
 }
 

@@ -18,14 +18,15 @@ export async function GET(request: NextRequest) {
     const kind = request.nextUrl.searchParams.get("kind") || "qr";
     if (kind === "qr") {
       const rows = await prisma.qRCode.findMany({
-        where: { workspaceId: user.workspaceId },
+        where: { workspaceId: user.workspaceId, deletedAt: null },
         include: { campaign: { select: { name: true } }, tags: { include: { tag: { select: { name: true } } } } },
-        orderBy: { createdAt: "desc" },
-        take: 10000,
+        orderBy: { number: "asc" },
+        take: 50000,
       });
       const content = csv([
-        ["Title", "Type", "Short code", "Destination or payload", "Status", "Scans", "Campaign", "Tags", "Created"],
+        ["Number", "Title", "Type", "Short code", "Destination or payload", "Status", "Scans", "Campaign", "Tags", "Created"],
         ...rows.map((qr) => [
+          qr.number,
           qr.title,
           qr.type,
           qr.shortCode,
