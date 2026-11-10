@@ -1,6 +1,6 @@
 # QR Manager
 
-A multi-tenant QR code SaaS: dynamic QR codes, custom business records with public pages, scan analytics, teams, API keys, webhooks and Razorpay billing. Built with Next.js (App Router), React, TypeScript, Prisma and MySQL.
+A multi-tenant QR code SaaS: numbered dynamic QR codes with search, bulk actions and a 30-day trash, custom business records with public pages, scan analytics, teams, API keys, webhooks and Razorpay billing. Built with Next.js (App Router), React, TypeScript, Prisma and MySQL.
 
 Each customer signs up into their own workspace. One platform owner account sees every workspace in a **Clients** panel and can suspend a client or grant a plan by hand.
 
@@ -21,16 +21,17 @@ npm run dev
 | --- | --- |
 | `npm run lint` | TypeScript |
 | `npm test` | Validation, payment signatures, QR decode for every colour and correction level |
-| `node tests/integration.mjs` | 77 HTTP checks against a running local server: auth, tenant isolation, roles, deletes, quotas, API keys, two-step sign-in, billing forgery. Creates disposable accounts, so never point it at production. |
+| `node tests/integration.mjs` | 97 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
 
 ## Structure
 
 | Path | Purpose |
 | --- | --- |
-| `app/app.css` | The whole design system. Colours are tokens, so the four accent themes and dark mode apply everywhere. |
-| `components/Dashboard.tsx` | Panel shell: navigation rail, top bar, toasts, confirm dialog. |
+| `app/app.css` | The whole design system: white work surface, one brand colour for actions, one fixed hue per module. Dark mode and the four accent themes only redefine tokens. See `DESIGN.md`. |
+| `components/Dashboard.tsx` | Panel shell: sidebar, header, New menu, command palette (Ctrl K), mobile tab bar, toasts, confirm dialog. |
 | `components/ui.tsx` | Shared types, `api()` helper, modal, theme control, motion presets. |
-| `components/Overview.tsx`, `QRCodes.tsx`, `QRStudio.tsx`, `Systems.tsx`, `Analytics.tsx` | Workspace views. |
+| `components/Overview.tsx`, `QRCodes.tsx`, `QRStudio.tsx`, `Systems.tsx`, `Analytics.tsx` | Workspace views. `QRCodes.tsx` holds search, filters, bulk actions and the trash. |
+| `components/SiteDemo.tsx` | The live QR generator and the destination-swap demo on the home page. |
 | `components/Connect.tsx` | Tags, campaigns, webhooks, API keys. |
 | `components/Workspace.tsx` | Team, billing, audit log, settings, help, clients (platform owner). |
 | `app/api/workspace` | Every workspace read and write, scoped by the signed-in user's workspace. |
@@ -44,8 +45,8 @@ npm run dev
 | Role | Can do |
 | --- | --- |
 | Owner | Everything, including billing, team and workspace settings |
-| Admin | Content, plus API keys and webhooks |
-| Editor | Create and edit codes, systems, records, tags and campaigns |
+| Admin | Content, plus API keys, webhooks and permanent deletion |
+| Editor | Create and edit codes, systems, records, tags and campaigns; move codes to the trash and restore them |
 | Viewer | View and download only |
 
 ## Before you sell it

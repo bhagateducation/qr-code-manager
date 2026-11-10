@@ -7,11 +7,16 @@
    - *Website link* codes are dynamic: the printed code never changes and you can edit where it leads. They also support separate iPhone and Android destinations and an end date.
    - *Contact card*, *Wi-Fi* and *Plain text* codes store their content inside the code, so reprint after editing them.
 3. **Download** the PNG or SVG. Every image is decoded and checked before the buttons are enabled. Keep the white margin when printing.
-4. **Organise** codes with tags and campaigns. Pause a code to stop it working without deleting it. Deleting removes the code and its scan history for good.
+4. **Organise** codes with tags and campaigns. Pause a code to stop it working without deleting it.
+   - **Numbers.** Every code gets its own number, such as `QR-00042`. A number is never reused, even after the code is deleted.
+   - **Find.** Search by number, name or link. Narrow the list by status, type, campaign or tag, sort it, and show 25, 50 or 100 rows. Type a page number to jump straight to it.
+   - **Bulk actions.** Tick several codes to pause, resume or trash them together (up to 100 at a time).
+   - **Trash.** Deleting moves a code to the trash, where it stops working but can be restored for 30 days. After that it is removed for good. Only an owner or admin can delete permanently or empty the trash.
+   - **Shortcuts.** Press `Ctrl K` anywhere to jump to a page, start something new or search your codes. The **New** button in the header creates a code, system, campaign or tag. In the list, the download icon saves the PNG without opening the code.
 5. **Systems & records** are your own tables (products, assets, members). Publish a record to get a read-only public page, then point a website link code at that page.
 6. **Analytics** shows scans per day, top codes, operating systems, browsers and busiest hours for today, 7, 30 or 90 days. *Export all scans* downloads a CSV.
 7. **Team.** The owner invites people as admin, editor or viewer. If email delivery is not configured, copy the invitation link shown on screen and send it yourself.
-8. **Settings.** Rename the workspace, change your password (this signs out your other devices) and turn on two-step sign-in. Keep the eight backup codes; each works once if you lose your phone.
+8. **Settings.** Rename the workspace, change your password (this signs out your other devices), turn on two-step sign-in, and use **Sign out other devices** if you used a shared or lost device. Keep the eight backup codes; each works once if you lose your phone.
 9. **Appearance.** The sun or moon button in the top bar switches accent colour and light or dark mode. The choice is saved in that browser.
 
 ## Plans

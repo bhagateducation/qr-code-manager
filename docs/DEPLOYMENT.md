@@ -32,6 +32,10 @@ For a generic Node host, copy `.next/static` into `.next/standalone/.next/static
 
 Run `npm run release` to create a clean source directory at `release/qr-manager` for Hostinger's deploy tool. The script copies only application/config/schema/bootstrap files, excluding local secrets, test databases, dependencies, tests and built assets. Point the Hostinger deploy operation at that directory with type `nodejs`, appType `next`, nodeVersion `22` or `24`, and buildScript `build`.
 
+## Upgrading an existing database
+
+Migration `202611100001_numbering_trash` adds QR numbers and the trash. It numbers existing codes in creation order with a window function, so it needs MySQL 8 or MariaDB 10.2 or newer. It has only been run on the local test database, not on MySQL: back up the database before the first build that applies it.
+
 ## Owner bootstrap
 
 The intended owner is `rahulbhagat7458@gmail.com`. Set a strong temporary `OWNER_INITIAL_PASSWORD` privately and run `node scripts/bootstrap.mjs` once in the server environment after migrations. It creates the platform owner and two labelled sample codes only when that account does not exist. It refuses to promote a pre-existing ordinary account automatically. Never infer owner privileges from the login email alone.

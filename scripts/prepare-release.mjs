@@ -12,6 +12,8 @@ const entries = [
   "docs",
   "scripts",
   "README.md",
+  "PRODUCT.md",
+  "DESIGN.md",
   "package.json",
   "package-lock.json",
   "next.config.mjs",
