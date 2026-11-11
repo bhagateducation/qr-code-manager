@@ -10,7 +10,9 @@
 4. **Organise** codes with tags and campaigns. Pause a code to stop it working without deleting it.
    - **Numbers.** Every code gets its own number, such as `QR-00042`. A number is never reused, even after the code is deleted.
    - **Find.** Search by number, name or link. Narrow the list by status, type, campaign or tag, sort it, and show 25, 50 or 100 rows. Type a page number to jump straight to it.
-   - **Bulk actions.** Tick several codes to pause, resume or trash them together (up to 100 at a time).
+   - **Folders.** Folders are your categories, and they nest (Book, then Chapter). Open a folder to see every code inside it and its sub-folders. Make one with **New folder** in the list, or with **New** next to the folder box while creating a code. **Print sheet** lays out all of a folder's codes with their names and numbers, ready to print or save as PDF. Deleting a folder keeps its codes.
+   - **Book QR.** For a book, enter its name, the link pattern and how many questions each chapter has. One click creates a folder for the book, a folder per chapter and a dynamic code for every question (up to 1,000 at a time), numbered in order.
+   - **Bulk actions.** Tick several codes to pause, resume, move to a folder or trash them together (up to 100 at a time).
    - **Trash.** Deleting moves a code to the trash, where it stops working but can be restored for 30 days. After that it is removed for good. Only an owner or admin can delete permanently or empty the trash.
    - **Shortcuts.** Press `Ctrl K` anywhere to jump to a page, start something new or search your codes. The **New** button in the header creates a code, system, campaign or tag. In the list, the download icon saves the PNG without opening the code.
 5. **Systems & records** are your own tables (products, assets, members). Publish a record to get a read-only public page, then point a website link code at that page.

@@ -36,6 +36,10 @@ Run `npm run release` to create a clean source directory at `release/qr-manager`
 
 Migration `202611100001_numbering_trash` adds QR numbers and the trash. It numbers existing codes in creation order with a window function, so it needs MySQL 8 or MariaDB 10.2 or newer. It was applied successfully to the live Hostinger MySQL database on 2026-11-10. On any other existing database, back up before the first build that applies it.
 
+## Platform owner without a shell
+
+On hosting with no shell (such as Hostinger), set `OWNER_EMAIL` and `OWNER_INITIAL_PASSWORD` in the environment, rebuild, then register at `/register` with that email and that exact password. The account becomes the platform owner; change the password in Settings and remove `OWNER_INITIAL_PASSWORD`. If an owner account with `OWNER_EMAIL` already existed before this version, it becomes the platform owner the next time it opens the panel. The platform owner's own workspace is always on the Business plan.
+
 ## Owner bootstrap
 
 The intended owner is `rahulbhagat7458@gmail.com`. Set a strong temporary `OWNER_INITIAL_PASSWORD` privately and run `node scripts/bootstrap.mjs` once in the server environment after migrations. It creates the platform owner and two labelled sample codes only when that account does not exist. It refuses to promote a pre-existing ordinary account automatically. Never infer owner privileges from the login email alone.

@@ -46,6 +46,23 @@ export async function GET(request: NextRequest) {
         },
       });
     }
+    if (kind === "sheet") {
+      const all = await prisma.folder.findMany({ where: { workspaceId: user.workspaceId }, select: { id: true, parentId: true, name: true } });
+      const root = all.find((folder) => folder.id === request.nextUrl.searchParams.get("folder"));
+      if (!root) throw new ApiError(404, "Folder not found.");
+      const ids = [root.id];
+      for (const id of ids) ids.push(...all.filter((folder) => folder.parentId === id).map((folder) => folder.id));
+      const rows = await prisma.qRCode.findMany({
+        where: { workspaceId: user.workspaceId, deletedAt: null, folderId: { in: ids } },
+        orderBy: { number: "asc" },
+        take: 1000,
+        select: { number: true, title: true, type: true, shortCode: true, targetUrl: true },
+      });
+      return NextResponse.json(
+        { title: root.name, codes: rows.map((qr) => ({ number: qr.number, title: qr.title, payload: qr.type === "dynamic_url" ? `${process.env.APP_URL}/s/${qr.shortCode}` : qr.targetUrl })) },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (kind === "scans") {
       const rows = await prisma.scanLog.findMany({
         where: { qrCode: { workspaceId: user.workspaceId } },

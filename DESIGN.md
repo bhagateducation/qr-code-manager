@@ -10,11 +10,13 @@ A white work surface, one brand colour for actions, and a fixed hue per module s
 - **Dark mode** redefines the tokens only; no component has its own dark rule except toned chips and the error toast.
 
 ## Type
-- Panel: system UI sans (Inter where installed), 14px body, fixed sizes: 20 / 15 / 14 / 13 / 12. Numbers use tabular figures.
-- Marketing and sign-in headings: Bricolage Grotesque Variable (self-hosted), weight 700, tracking -0.035em.
+- One family everywhere: Poppins (self-hosted, weights 400 / 500 / 600 / 700).
+- Panel: 14px body, fixed sizes 20 / 15 / 14 / 13 / 12. Numbers use tabular figures.
+- Marketing and sign-in headings: weight 700, tracking -0.035em.
 
 ## Shape and depth
 - Radius 8 (controls), 12 (panels), 16 to 28 (dialogs, marketing tiles).
+- Soft 3D: surfaces look gently raised. Each raised thing has a light top edge (inset highlight), a darker bottom edge and a soft offset shadow (`--lift`); buttons press down 1px. Icon chips are small toned pillows.
 - Three shadows, all with an offset: `--shadow-1` controls, `--shadow-2` menus and previews, `--shadow-3` dialogs.
 
 ## Layout
@@ -22,4 +24,4 @@ A white work surface, one brand colour for actions, and a fixed hue per module s
 - One button shape. Filled means the main action; there is one per view.
 
 ## Motion
-150 to 250ms, ease `cubic-bezier(0.22, 1, 0.36, 1)`. Motion marks a state change: the sliding nav selection, view changes, menus, toasts, growing meters and bars. The one authored moment is the destination swap on the home page. Everything respects reduced motion.
+150 to 250ms, ease `cubic-bezier(0.22, 1, 0.36, 1)`. Motion marks a state change: the sliding nav selection, view changes, menus, toasts, growing meters and bars. On the home page sections rise in as they enter view, the feature tiles tilt toward the pointer, the generator's labels float, and a thin bar tracks scroll progress; the destination swap is the one authored moment. Everything respects reduced motion.

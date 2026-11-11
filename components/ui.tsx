@@ -6,6 +6,7 @@ import { Check, Copy, Moon, Palette, Sun, X, type LucideIcon } from "lucide-reac
 export type QR = {
   id: string;
   number: number;
+  folderId?: string | null;
   deletedAt?: string | null;
   title: string;
   shortCode: string;
@@ -20,6 +21,15 @@ export type QR = {
   campaign?: { id: string; name: string } | null;
   tags?: { tag: { id: string; name: string; color: string } }[];
 };
+/** A category. Folders nest (Book > Chapter); a code sits in at most one. */
+export type Folder = { id: string; parentId: string | null; name: string; kind: string; _count: { qrCodes: number } };
+/** The folder and its ancestors, outermost first. */
+export function folderTrail(folders: Folder[], id?: string | null) {
+  const trail: Folder[] = [];
+  for (let folder = folders.find((item) => item.id === id); folder; folder = folders.find((item) => item.id === folder!.parentId)) trail.unshift(folder);
+  return trail;
+}
+export const folderPath = (folders: Folder[], id?: string | null) => folderTrail(folders, id).map((folder) => folder.name).join(" / ");
 export type Field = { key: string; label: string; type: string; isRequired: boolean };
 export type System = { id: string; name: string; description: string; fields: Field[]; _count: { records: number } };
 export type Data = {
@@ -34,6 +44,7 @@ export type Data = {
   recordCount: number;
   codeCount: number;
   trashCount: number;
+  folders: Folder[];
   pageSize: number;
   topCodes: { id: string; title: string; scanCount: number }[];
   limits: { codes: number; systems: number; records: number };
@@ -52,8 +63,8 @@ export type Data = {
   invitations: { id: string; email: string; role: string; expiresAt: string }[];
 };
 /** How the QR list is narrowed and ordered. Sent to the server as query parameters. */
-export type Filters = { search: string; status: string; tag: string; campaign: string; type: string; sort: string; size: string };
-export const noFilters: Filters = { search: "", status: "", tag: "", campaign: "", type: "", sort: "", size: "25" };
+export type Filters = { search: string; status: string; tag: string; campaign: string; type: string; folder: string; sort: string; size: string };
+export const noFilters: Filters = { search: "", status: "", tag: "", campaign: "", type: "", folder: "", sort: "", size: "25" };
 /** QR-00042: fixed width so numbers sort and scan well on printed lists. */
 export const qrNumber = (value: number) => `QR-${String(value).padStart(5, "0")}`;
 export type Ask = (options: { title: string; body: string; action: string; danger?: boolean }) => Promise<boolean>;
@@ -68,6 +79,8 @@ export type Ctx = {
   ask: Ask;
   reload: () => Promise<void>;
   go: (tab: string) => void;
+  /** Opens the QR list showing one folder and everything inside it. */
+  openFolder: (id: string) => void;
 };
 
 export async function api(path: string, data?: unknown) {

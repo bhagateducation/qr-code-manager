@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import {
   authorize,
@@ -44,6 +44,12 @@ export async function GET(request: NextRequest) {
     const term = search.trim();
     // "#42", "42" and "QR-00042" all find code number 42.
     const number = /^(?:qr-?|#)?0*(\d{1,9})$/i.exec(term)?.[1];
+    let folderIds: string[] | undefined;
+    if (params.get("folder") && params.get("folder") !== "none") {
+      const tree = await prisma.folder.findMany({ where: { workspaceId }, select: { id: true, parentId: true } });
+      folderIds = [params.get("folder")!];
+      for (const id of folderIds) folderIds.push(...tree.filter((folder) => folder.parentId === id).map((folder) => folder.id));
+    }
     const where = {
       workspaceId,
       deletedAt: status === "trash" ? { not: null } : null,
@@ -60,6 +66,7 @@ export async function GET(request: NextRequest) {
       ...(status === "active" ? { isActive: true } : status === "paused" ? { isActive: false } : {}),
       ...(params.get("tag") ? { tags: { some: { tagId: params.get("tag")! } } } : {}),
       ...(params.get("campaign") ? { campaignId: params.get("campaign")! } : {}),
+      ...(folderIds ? { folderId: { in: folderIds } } : params.get("folder") === "none" ? { folderId: null } : {}),
       ...(["dynamic_url", "wifi", "vcard", "text"].includes(params.get("type") || "") ? { type: params.get("type")! } : {}),
     };
     const orderBy =
@@ -94,6 +101,7 @@ export async function GET(request: NextRequest) {
       recordCount,
       codeCount,
       trashCount,
+      folders,
     ] = await Promise.all([
       prisma.qRCode.findMany({
         where,
@@ -156,7 +164,17 @@ export async function GET(request: NextRequest) {
       prisma.record.count({ where: { system: { workspaceId } } }),
       prisma.qRCode.count({ where: live }),
       prisma.qRCode.count({ where: { workspaceId, deletedAt: { not: null } } }),
+      prisma.folder.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" }, take: 2000, select: { id: true, parentId: true, name: true, kind: true, _count: { select: { qrCodes: { where: { deletedAt: null } } } } } }),
     ]);
+    // The configured owner's existing account becomes the platform owner on installs that have none yet.
+    // New registrations of that address are gated separately (see the auth route).
+    if (!user.platformAdmin && user.role === "owner" && process.env.OWNER_EMAIL?.toLowerCase() === user.email && !(await prisma.user.count({ where: { platformAdmin: true } }))) {
+      await prisma.user.update({ where: { id: user.id }, data: { platformAdmin: true } });
+      user.platformAdmin = true;
+    }
+    // The platform owner's own workspace is never limited by a plan.
+    if (user.platformAdmin && effectivePlan(user.workspace) !== "business")
+      user.workspace = await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "business", paidUntil: new Date("2099-12-31") } });
     const plan = effectivePlan(user.workspace);
     const prices = {
       pro: Number(process.env.PLAN_PRO_PAISE || 0),
@@ -195,6 +213,7 @@ export async function GET(request: NextRequest) {
       recordCount,
       codeCount,
       trashCount,
+      folders,
       pageSize: size,
       limits: limits[plan],
       prices,
@@ -271,6 +290,8 @@ export async function POST(request: NextRequest) {
           !(await tx.campaign.findFirst({ where: { id: campaignId, workspaceId } }))
         )
           throw new ApiError(404, "Campaign not found.");
+        if (qrData.folderId && !(await tx.folder.findFirst({ where: { id: qrData.folderId, workspaceId } })))
+          throw new ApiError(404, "Folder not found.");
         const validTags = tagIds.length
           ? await tx.tag.findMany({ where: { id: { in: tagIds }, workspaceId }, select: { id: true } })
           : [];
@@ -330,8 +351,10 @@ export async function POST(request: NextRequest) {
         if (!entity) throw new ApiError(404, "QR not found.");
       } else if (input.action === "qr.bulk") {
         const data = z
-          .object({ ids: z.array(z.string().max(100)).min(1).max(100), op: z.enum(["pause", "resume", "trash", "restore", "purge"]) })
+          .object({ ids: z.array(z.string().max(100)).min(1).max(100), op: z.enum(["pause", "resume", "trash", "restore", "purge", "move"]), folderId: z.string().max(80).nullable().optional() })
           .parse(input.data);
+        if (data.op === "move" && data.folderId && !(await tx.folder.findFirst({ where: { id: data.folderId, workspaceId } })))
+          throw new ApiError(404, "Folder not found.");
         const trashed = data.op === "restore" || data.op === "purge";
         const scope = { id: { in: data.ids }, workspaceId, deletedAt: trashed ? { not: null } : null };
         if (data.op === "purge") {
@@ -342,11 +365,68 @@ export async function POST(request: NextRequest) {
             throw new ApiError(409, "Restoring these would go over your plan QR limit.");
           await tx.qRCode.updateMany({
             where: scope,
-            data: data.op === "pause" ? { isActive: false } : data.op === "resume" ? { isActive: true } : { deletedAt: data.op === "trash" ? new Date() : null },
+            data: data.op === "move" ? { folderId: data.folderId || null } : data.op === "pause" ? { isActive: false } : data.op === "resume" ? { isActive: true } : { deletedAt: data.op === "trash" ? new Date() : null },
           });
         }
         input.action = `qr.bulk.${data.op}`;
         entity = { id: workspaceId };
+      } else if (input.action === "folder.create") {
+        const data = z.object({ name, parentId: z.string().max(80).nullable().optional() }).parse(input.data);
+        let depth = 1;
+        for (let id = data.parentId; id; depth++) {
+          const parent: { parentId: string | null } | null = await tx.folder.findFirst({ where: { id, workspaceId }, select: { parentId: true } });
+          if (!parent) throw new ApiError(404, "Parent folder not found.");
+          id = parent.parentId;
+        }
+        if (depth > 5) throw new ApiError(400, "Folders can be nested up to five levels.");
+        if ((await tx.folder.count({ where: { workspaceId } })) >= 2000) throw new ApiError(409, "This workspace has reached 2,000 folders.");
+        entity = await tx.folder.create({ data: { name: data.name, parentId: data.parentId || null, workspaceId } });
+      } else if (input.action === "folder.rename") {
+        if (!input.id) throw new ApiError(400, "Folder is required.");
+        entity = await tx.folder.updateMany({ where: { id: input.id, workspaceId }, data: { name: name.parse(input.data) } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Folder not found.");
+      } else if (input.action === "folder.delete") {
+        if (!input.id) throw new ApiError(400, "Folder is required.");
+        // Sub-folders go with it; the codes inside are kept and simply become unfiled.
+        entity = await tx.folder.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
+        if (!entity) throw new ApiError(404, "Folder not found.");
+      } else if (input.action === "book.create") {
+        // One book = one folder, one sub-folder per chapter, one dynamic code per question.
+        const data = z
+          .object({
+            title: name,
+            urlTemplate: z.string().trim().min(1).max(1500),
+            chapters: z.array(z.object({ name, questions: z.number().int().min(1).max(200) })).min(1).max(60),
+          })
+          .parse(input.data);
+        const total = data.chapters.reduce((sum, chapter) => sum + chapter.questions, 0);
+        if (total > 1000) throw new ApiError(400, "Create at most 1,000 codes at a time. Split the book into two parts.");
+        const fill = (chapter: number, question: number) => data.urlTemplate.replaceAll("{chapter}", String(chapter)).replaceAll("{question}", String(question));
+        if (!destination.safeParse(fill(1, 1)).success) throw new ApiError(400, "Use a public http or https address for the link.");
+        if (new URL(fill(1, 1)).origin === new URL(process.env.APP_URL!).origin && new URL(fill(1, 1)).pathname.startsWith("/s/"))
+          throw new ApiError(400, "A QR cannot redirect to another QR resolver on this site.");
+        if ((await tx.qRCode.count({ where: { workspaceId, deletedAt: null } })) + total > quota.codes)
+          throw new ApiError(409, `This book needs ${total} codes, which is more than your plan has left.`);
+        const book = await tx.folder.create({ data: { name: data.title, kind: "book", workspaceId } });
+        const chapters = data.chapters.map((chapter) => ({ id: randomUUID(), name: chapter.name, kind: "chapter", parentId: book.id, workspaceId }));
+        await tx.folder.createMany({ data: chapters });
+        const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: total } } });
+        let number = qrSeq - total;
+        await tx.qRCode.createMany({
+          data: data.chapters.flatMap((chapter, index) =>
+            Array.from({ length: chapter.questions }, (_, question) => ({
+              workspaceId,
+              folderId: chapters[index].id,
+              number: ++number,
+              title: `${chapter.name} · Q${question + 1}`.slice(0, 100),
+              targetUrl: fill(index + 1, question + 1),
+              shortCode: randomBytes(9).toString("base64url"),
+              styling: { dark: "#17161D", light: "#FFFFFF", errorCorrectionLevel: "M" },
+              routingRules: {},
+            })),
+          ),
+        });
+        entity = book;
       } else if (input.action === "trash.empty") {
         if (!["owner", "admin"].includes(user.role)) throw new ApiError(403, "Only owners and admins can empty the trash.");
         await tx.qRCode.deleteMany({ where: { workspaceId, deletedAt: { not: null } } });

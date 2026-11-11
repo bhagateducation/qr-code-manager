@@ -21,6 +21,7 @@ model Workspace {
   users       User[]
   systems     System[]
   qrCodes     QRCode[]
+  folders     Folder[]
   webhooks    Webhook[]
   tags        Tag[]
   automations Automation[]
@@ -129,6 +130,7 @@ model QRCode {
   styling      Json?      // fgColor, bgColor, pattern, corner, logo, frame
   scanCount    Int        @default(0)
   isActive     Boolean    @default(true)
+  folderId     String?
   number       Int        @default(0) // human-friendly number, unique per workspace
   deletedAt    DateTime?  // set while the code sits in the trash
   createdAt    DateTime   @default(now())
@@ -137,6 +139,7 @@ model QRCode {
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   record       Record?    @relation(fields: [recordId], references: [id], onDelete: SetNull)
   campaign     Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  folder       Folder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
   scanLogs     ScanLog[]
   tags         QRCodeTag[]
 
@@ -144,6 +147,7 @@ model QRCode {
   @@index([recordId])
   @@index([campaignId])
   @@index([shortCode])
+  @@index([folderId])
   @@unique([workspaceId, number])
   @@index([workspaceId, deletedAt, createdAt])
   @@map("qr_codes")
@@ -241,6 +245,24 @@ model Campaign {
   qrCodes     QRCode[]
   @@index([workspaceId, status])
   @@map("campaigns")
+}
+
+// A folder (category). Folders nest, e.g. Book > Chapter; "kind" marks the ones made by the Book QR tool.
+model Folder {
+  id          String    @id @default(uuid())
+  workspaceId String
+  parentId    String?
+  name        String
+  kind        String    @default("folder") // folder, book, chapter
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent      Folder?   @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[]  @relation("FolderTree")
+  qrCodes     QRCode[]
+
+  @@index([workspaceId, parentId])
+  @@map("folders")
 }
 
 model QRCodeTag {

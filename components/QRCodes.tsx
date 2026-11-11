@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Copy, Download, Pause, Pencil, Play, Plus, QrCode, RotateCcw, Search, Trash2, X } from "lucide-react";
-import { Ctx, Empty, Filters, QR, formatDate, noFilters, qrNumber } from "./ui";
+import { Fragment, useEffect, useState } from "react";
+import { ArrowUpRight, ChevronRight, Copy, Download, Folder as FolderIcon, FolderPlus, Pause, Pencil, Play, Plus, Printer, QrCode, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { PrintSheet } from "./Books";
+import { Ctx, Empty, Filters, QR, folderPath, folderTrail, formatDate, noFilters, qrNumber } from "./ui";
 
 const typeLabel: Record<string, string> = { dynamic_url: "Website link", wifi: "Wi-Fi", vcard: "Contact card", text: "Plain text" };
 const TRASH_DAYS = 30;
@@ -24,6 +25,8 @@ export default function QRCodes({
   const { data, canWrite, isAdmin, mutate, notify, ask } = ctx;
   const [search, setSearch] = useState(filters.search);
   const [selected, setSelected] = useState<string[]>([]);
+  const [naming, setNaming] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
   const inTrash = filters.status === "trash";
   const set = (patch: Partial<Filters>) => {
     setPage(1);
@@ -42,8 +45,20 @@ export default function QRCodes({
 
   // Clearing keeps you where you are (trash or not) and keeps your sort and page size.
   const clearFilters = () => (setSearch(""), set({ ...noFilters, sort: filters.sort, size: filters.size, status: inTrash ? "trash" : "" }));
+  const folder = data.folders.find((item) => item.id === filters.folder);
+  const subfolders = data.folders.filter((item) => item.parentId === (folder?.id || null));
+  // A folder's count includes everything filed beneath it.
+  const deepCount = (id: string): number => data.folders.filter((item) => item.parentId === id).reduce((sum, item) => sum + deepCount(item.id), data.folders.find((item) => item.id === id)?._count.qrCodes || 0);
+  async function addFolder() {
+    if (!naming?.trim()) return;
+    await mutate("folder.create", { name: naming.trim(), parentId: folder?.id || null }).then(() => setNaming(null), () => {});
+  }
+  async function removeFolder() {
+    if (folder && (await ask({ title: `Delete the folder “${folder.name}”?`, body: "The folder and its sub-folders are removed. The QR codes inside are kept and keep working; they just no longer sit in a folder.", action: "Delete folder" })))
+      await mutate("folder.delete", undefined, folder.id).then(() => set({ folder: folder.parentId || "" }), () => {});
+  }
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
-  const narrowed = filters.search || filters.tag || filters.campaign || filters.type || (filters.status && !inTrash);
+  const narrowed = filters.search || filters.tag || filters.campaign || filters.type || filters.folder || (filters.status && !inTrash);
   const allSelected = data.qrCodes.length > 0 && selected.length === data.qrCodes.length;
   const link = (qr: QR) => `${data.appUrl}/s/${qr.shortCode}`;
   const copy = (qr: QR) =>
@@ -112,6 +127,65 @@ export default function QRCodes({
           )}
       </div>
 
+      {!inTrash && (
+        <div className="toolbar folders">
+          <button className="chip" aria-pressed={!filters.folder} onClick={() => set({ folder: "" })}>
+            <FolderIcon size={13} /> All folders
+          </button>
+          {folderTrail(data.folders, folder?.id).map((item) => (
+            <Fragment key={item.id}>
+              <ChevronRight size={14} className="muted" />
+              <button className="chip" aria-pressed={item.id === folder?.id} onClick={() => set({ folder: item.id })}>
+                {item.name}
+              </button>
+            </Fragment>
+          ))}
+          {subfolders.length > 0 && <span className="folder-divider" />}
+          {subfolders.map((item) => (
+            <button className="chip" key={item.id} onClick={() => set({ folder: item.id })}>
+              <FolderIcon size={13} /> {item.name} <small className="num">{deepCount(item.id)}</small>
+            </button>
+          ))}
+          {!folder && data.folders.length > 0 && (
+            <button className="chip" aria-pressed={filters.folder === "none"} onClick={() => set({ folder: "none" })}>
+              Not in a folder
+            </button>
+          )}
+          <span className="grow" />
+          {folder && (
+            <>
+              <button className="button small" onClick={() => setPrinting(true)}>
+                <Printer size={14} /> Print sheet
+              </button>
+              {canWrite && (
+                <button className="icon-button danger" title="Delete folder" aria-label={`Delete folder ${folder.name}`} onClick={removeFolder}>
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </>
+          )}
+          {canWrite &&
+            (naming === null ? (
+              <button className="button small" onClick={() => setNaming("")}>
+                <FolderPlus size={14} /> New folder
+              </button>
+            ) : (
+              <form
+                className="row-actions"
+                style={{ flexWrap: "nowrap" }}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void addFolder();
+                }}
+              >
+                <input autoFocus aria-label="New folder name" value={naming} maxLength={100} placeholder={folder ? `New folder inside ${folder.name}` : "New folder name"} onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setNaming(null)} style={{ minHeight: 30, padding: "2px 8px", width: 200 }} />
+                <button className="button small primary">Add</button>
+              </form>
+            ))}
+        </div>
+      )}
+      {printing && folder && <PrintSheet folderId={folder.id} onClose={() => setPrinting(false)} notify={notify} />}
+
       <div className="toolbar filters">
         {selected.length ? (
           <>
@@ -135,6 +209,15 @@ export default function QRCodes({
                 <button className="button small" onClick={() => bulk("resume")}>
                   <Play size={14} /> Resume
                 </button>
+                <select aria-label="Move selected codes to a folder" value="" onChange={(e) => e.target.value && mutate("qr.bulk", { ids: selected, op: "move", folderId: e.target.value === "none" ? null : e.target.value }).then(() => setSelected([]), () => {})}>
+                  <option value="">Move to folder…</option>
+                  <option value="none">No folder</option>
+                  {data.folders.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {folderPath(data.folders, item.id)}
+                    </option>
+                  ))}
+                </select>
                 <button className="button small danger" onClick={() => bulk("trash")}>
                   <Trash2 size={14} /> Move to trash
                 </button>

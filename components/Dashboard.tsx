@@ -7,6 +7,7 @@ import {
   Activity,
   AlertCircle,
   BarChart3,
+  BookOpen,
   Building2,
   Check,
   ChevronRight,
@@ -43,11 +44,13 @@ const loading = () => <div className="skeleton" style={{ height: 320 }} />;
 const QRStudio = dynamic(() => import("./QRStudio"), { loading });
 const Systems = dynamic(() => import("./Systems"), { loading });
 const Analytics = dynamic(() => import("./Analytics"), { loading });
+const Books = dynamic(() => import("./Books"), { loading });
 
 // Each module owns one hue, used for its icon everywhere it appears.
 const navigation = [
   { id: "overview", label: "Home", icon: Home, tone: "var(--brand)", group: "", hint: "Your workspace at a glance" },
   { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "", hint: "Create, edit and download your codes" },
+  { id: "books", label: "Book QR", icon: BookOpen, tone: "var(--c-orange)", group: "", hint: "A QR code for every question of a book, sorted by chapter" },
   { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "", hint: "Scans, devices and busiest times" },
   { id: "systems", label: "Systems & records", icon: Layers, tone: "var(--c-violet)", group: "Organise", hint: "Your own tables, with a public page per record" },
   { id: "campaigns", label: "Campaigns", icon: Megaphone, tone: "var(--c-pink)", group: "Organise", hint: "Group codes that belong to one campaign" },
@@ -160,6 +163,7 @@ export default function Dashboard() {
       canWrite
         ? [
             { label: "New QR code", icon: QrCode, tone: "var(--c-blue)", group: "Create", run: () => openStudio(null) },
+            { label: "New book QR set", icon: BookOpen, tone: "var(--c-orange)", group: "Create", run: () => go("books") },
             { label: "New system", icon: Layers, tone: "var(--c-violet)", group: "Create", run: () => go("systems") },
             { label: "New campaign", icon: Megaphone, tone: "var(--c-pink)", group: "Create", run: () => go("campaigns") },
             { label: "New tag", icon: Tag, tone: "var(--c-amber)", group: "Create", run: () => go("tags") },
@@ -226,6 +230,11 @@ export default function Dashboard() {
     notify,
     reload,
     go,
+    openFolder: (id) => {
+      setPage(1);
+      setFilters({ ...noFilters, folder: id, sort: "number" });
+      go("codes");
+    },
     ask: (options) => new Promise((resolve) => setConfirm({ ...options, resolve })),
     mutate: async (action, payload, id) => {
       try {
@@ -280,7 +289,7 @@ export default function Dashboard() {
             }}
           >
             <Search size={15} />
-            <span className="grow">Search or jump to…</span>
+            <span className="grow truncate">Search…</span>
             <kbd>Ctrl K</kbd>
           </button>
           <nav>
@@ -383,10 +392,11 @@ export default function Dashboard() {
                   {view === "overview" && <Overview ctx={ctx} openStudio={openStudio} />}
                   {view === "codes" &&
                     (editing !== undefined ? (
-                      <QRStudio key={editing?.id || "new"} ctx={ctx} qr={editing} onClose={() => setEditing(undefined)} />
+                      <QRStudio key={editing?.id || "new"} ctx={ctx} qr={editing} defaultFolder={filters.folder === "none" ? "" : filters.folder} onClose={() => setEditing(undefined)} />
                     ) : (
                       <QRCodes ctx={ctx} page={page} setPage={setPage} filters={filters} setFilters={setFilters} openStudio={openStudio} />
                     ))}
+                  {view === "books" && <Books ctx={ctx} />}
                   {view === "systems" && <Systems ctx={ctx} />}
                   {view === "campaigns" && <Campaigns ctx={ctx} />}
                   {view === "tags" && <Tags ctx={ctx} />}

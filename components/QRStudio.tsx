@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, Contact, Download, Link2, QrCode, Trash2, Type, Wifi } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Contact, Download, FolderPlus, Link2, QrCode, Trash2, Type, Wifi } from "lucide-react";
 import { buildVCardPayload, buildWifiPayload, QRType } from "@/lib/qr-payload";
-import { CopyButton, Ctx, QR, qrNumber, saveFile } from "./ui";
+import { CopyButton, Ctx, QR, folderPath, qrNumber, saveFile } from "./ui";
 
 type Styling = { dark: string; light: string; errorCorrectionLevel: "L" | "M" | "Q" | "H" };
 const types: { id: QRType; label: string; icon: typeof Link2 }[] = [
@@ -27,7 +27,7 @@ const toLocalInput = (iso?: string) => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 
-export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null; onClose: () => void }) {
+export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx: Ctx; qr: QR | null; defaultFolder?: string; onClose: () => void }) {
   const { data, canWrite, mutate, notify, ask } = ctx;
   const [saved, setSaved] = useState(qr),
     [title, setTitle] = useState(qr?.title || ""),
@@ -38,6 +38,8 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
     [ios, setIos] = useState(qr?.routingRules?.ios || ""),
     [android, setAndroid] = useState(qr?.routingRules?.android || ""),
     [campaignId, setCampaignId] = useState(qr?.campaignId || ""),
+    [folderId, setFolderId] = useState(qr ? qr.folderId || "" : defaultFolder),
+    [naming, setNaming] = useState<string | null>(null),
     [tagIds, setTagIds] = useState<string[]>(qr?.tags?.map((item) => item.tag.id) || []),
     [expiry, setExpiry] = useState(toLocalInput(qr?.routingRules?.expiresAt)),
     [style, setStyle] = useState<Styling>((qr?.styling as Styling) || { dark: "#17161D", light: "#FFFFFF", errorCorrectionLevel: "M" }),
@@ -92,6 +94,7 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
           styling: style,
           recordId: saved?.recordId || null,
           campaignId: campaignId || null,
+          folderId: folderId || null,
           tagIds,
           routingRules: qrType === "dynamic_url" ? { ...(ios ? { ios } : {}), ...(android ? { android } : {}), ...(expiry ? { expiresAt: new Date(expiry).toISOString() } : {}) } : {},
         },
@@ -118,6 +121,15 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
     } catch {
       notify("The SVG could not be generated.", "error");
     }
+  }
+  // Make a category without leaving the form; it is created inside the folder currently chosen.
+  async function addFolder() {
+    if (!naming?.trim()) return;
+    try {
+      const result = await mutate("folder.create", { name: naming.trim(), parentId: folderId || null });
+      setFolderId(result.entity.id);
+      setNaming(null);
+    } catch {}
   }
   async function remove() {
     if (saved && (await ask({ title: `Move “${saved.title}” to the trash?`, body: "It stops working when scanned. You can restore it from the trash for 30 days.", action: "Move to trash" })))
@@ -239,6 +251,30 @@ export default function QRStudio({ ctx, qr, onClose }: { ctx: Ctx; qr: QR | null
                   <option value="H">Highest — may get damaged</option>
                 </select>
               </label>
+            </div>
+            <div>
+              <span className="field-label">Folder</span>
+              <div className="row-actions" style={{ marginTop: 6, flexWrap: "nowrap" }}>
+                <select aria-label="Folder" value={folderId} onChange={(e) => setFolderId(e.target.value)}>
+                  <option value="">No folder</option>
+                  {data.folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folderPath(data.folders, folder.id)}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="button" onClick={() => setNaming(naming === null ? "" : null)}>
+                  <FolderPlus size={15} /> New
+                </button>
+              </div>
+              {naming !== null && (
+                <div className="row-actions" style={{ marginTop: 8, flexWrap: "nowrap" }}>
+                  <input autoFocus aria-label="New folder name" value={naming} maxLength={100} placeholder={folderId ? `New folder inside ${data.folders.find((folder) => folder.id === folderId)?.name}` : "New folder name"} onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addFolder())} />
+                  <button type="button" className="button primary" onClick={addFolder}>
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
             <label>
               Campaign

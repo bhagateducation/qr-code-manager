@@ -56,6 +56,7 @@ export const qrSchema = z.object({
   targetUrl: z.string().trim().min(1).max(4096),
   recordId: z.string().max(80).nullable().optional(),
   campaignId: z.string().max(80).nullable().optional(),
+  folderId: z.string().max(80).nullable().optional(),
   tagIds: z.array(z.string().max(80)).max(20).default([]),
   isActive: z.boolean().default(true),
   styling: z

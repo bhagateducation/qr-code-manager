@@ -3,7 +3,7 @@ import { ArrowRight, Check, Download, PencilLine, QrCode, ScanLine, Search, Shie
 import { BRAND } from "@/lib/brand";
 import { limits } from "@/lib/validation";
 import Reveal from "@/components/Reveal";
-import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
+import { LiveDemo, ScrollBar, SiteMotion, SwapDemo, Tile } from "@/components/SiteDemo";
 import { ThemeControl } from "@/components/ui";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
@@ -23,8 +23,10 @@ export default function Home() {
     { id: "business", name: "Business", price: Number(process.env.PLAN_BUSINESS_PAISE || 0) / 100, note: "For large collections and operations" },
   ];
   return (
+    <SiteMotion>
     <div className="site">
       <header className="site-nav">
+        <ScrollBar />
         <div>
           <Link href="/" className="brand">
             <span className="brand-mark">
@@ -88,19 +90,19 @@ export default function Home() {
         </div>
 
         <section id="features" className="site-section">
-          <div className="section-intro">
+          <Reveal className="section-intro">
             <h2 className="display">Everything a code needs after it is printed</h2>
             <p>Codes, destinations, business records and scan activity live in one workspace, so nothing gets lost between tools.</p>
-          </div>
+          </Reveal>
           <div className="bento">
-            <article className="tile w4" style={tone("var(--c-blue)")}>
+            <Tile className="tile w4" style={tone("var(--c-blue)")} delay={0.00}>
               <h3>Change the link. Keep the print.</h3>
               <p>Menus change, campaigns end, websites move. Point the same printed code somewhere new, pause it, or give it an end date.</p>
               <div className="tile-art">
                 <SwapDemo />
               </div>
-            </article>
-            <article className="tile w2" style={tone("var(--c-green)")}>
+            </Tile>
+            <Tile className="tile w2" style={tone("var(--c-green)")} delay={0.08}>
               <h3>See every scan</h3>
               <p>Scans per day, busiest hours, devices and your top codes. Export it all to CSV.</p>
               <div className="tile-art bars" style={{ height: 96, paddingTop: 0 }} aria-hidden>
@@ -110,8 +112,8 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-            </article>
-            <article className="tile w2" style={tone("var(--c-amber)")}>
+            </Tile>
+            <Tile className="tile w2" style={tone("var(--c-amber)")} delay={0.16}>
               <h3>Find one among thousands</h3>
               <p>Every code has a number. Search by number, name or link, then filter and act in bulk.</p>
               <div className="tile-art mock" aria-hidden>
@@ -127,8 +129,8 @@ export default function Home() {
                   <span className="status active">Active</span>
                 </div>
               </div>
-            </article>
-            <article className="tile w2" style={tone("var(--c-violet)")}>
+            </Tile>
+            <Tile className="tile w2" style={tone("var(--c-violet)")} delay={0.00}>
               <h3>Route by device</h3>
               <p>One code, the right place for each phone.</p>
               <div className="tile-art route" aria-hidden>
@@ -143,8 +145,8 @@ export default function Home() {
                 <span>Everyone else</span>
                 <em>Your website</em>
               </div>
-            </article>
-            <article className="tile w2" style={tone("var(--c-pink)")}>
+            </Tile>
+            <Tile className="tile w2" style={tone("var(--c-pink)")} delay={0.08}>
               <h3>Records with public pages</h3>
               <p>Build your own tables for products, assets or members. Publish a record and a code can open it.</p>
               <div className="tile-art mock" aria-hidden>
@@ -159,8 +161,8 @@ export default function Home() {
                   350 ml
                 </div>
               </div>
-            </article>
-            <article className="tile w3" style={tone("var(--c-sky)")}>
+            </Tile>
+            <Tile className="tile w3" style={tone("var(--c-sky)")} delay={0.16}>
               <h3>Built for teams</h3>
               <p>Invite people as admin, editor or viewer. Every change is written to an audit log, so you always know who did what.</p>
               <div className="tile-art chips" aria-hidden>
@@ -170,48 +172,50 @@ export default function Home() {
                   </span>
                 ))}
               </div>
-            </article>
-            <article className="tile w3" style={tone("var(--c-teal)")}>
+            </Tile>
+            <Tile className="tile w3" style={tone("var(--c-teal)")} delay={0.00}>
               <h3>API and webhooks</h3>
               <p>Create codes from your own software and receive a signed event the moment one is scanned.</p>
               <pre className="snippet tile-art" aria-hidden>{`POST /api/v1/qr
 { "title": "Spring menu",
   "targetUrl": "https://yourshop.com/menu" }`}</pre>
-            </article>
+            </Tile>
           </div>
         </section>
 
         <section id="how-it-works" className="site-section">
-          <div className="section-intro">
+          <Reveal className="section-intro">
             <h2 className="display">Working code in three steps</h2>
-          </div>
+          </Reveal>
           <ol className="steps">
             {[
               { icon: PencilLine, tone: "var(--c-blue)", title: "Create", text: "Name your code and paste a link, a Wi-Fi network or a contact." },
               { icon: Download, tone: "var(--c-violet)", title: "Download and print", text: "Every image is scan-tested before you get it, as PNG or vector SVG." },
               { icon: ScanLine, tone: "var(--c-green)", title: "Update and measure", text: "Change the destination whenever you need and watch the scans arrive." },
-            ].map((step) => (
+            ].map((step, index) => (
               <li className="step" key={step.title}>
+                <Reveal delay={index * 0.1}>
                 <step.icon className="tone" style={tone(step.tone)} />
                 <h3>{step.title}</h3>
                 <p>{step.text}</p>
+                </Reveal>
               </li>
             ))}
           </ol>
         </section>
 
         <section className="site-section">
-          <div className="section-intro">
+          <Reveal className="section-intro">
             <h2 className="display">Safe by default</h2>
             <p>Your codes are printed on real things. Losing or leaking them is not an option.</p>
-          </div>
+          </Reveal>
           <div className="three-col">
             {[
               { icon: ShieldCheck, tone: "var(--c-green)", title: "Two-step sign-in", text: "Protect every account with an authenticator app and one-time backup codes." },
               { icon: Trash2, tone: "var(--c-orange)", title: "30-day trash", text: "Deleted codes can be restored for a month. Only owners and admins can remove them for good." },
               { icon: Users, tone: "var(--c-sky)", title: "Separate workspaces", text: "Each business has its own workspace. Access is checked on the server for every request." },
-            ].map((item) => (
-              <div key={item.title} className="row-actions" style={{ alignItems: "start", flexWrap: "nowrap", gap: 14 }}>
+            ].map((item, index) => (
+              <Reveal key={item.title} delay={index * 0.1} className="row-actions safe-point">
                 <span className="page-icon" style={tone(item.tone)}>
                   <item.icon size={20} />
                 </span>
@@ -221,21 +225,21 @@ export default function Home() {
                     {item.text}
                   </p>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </section>
 
         <section id="pricing" className="site-section">
-          <div className="section-intro">
+          <Reveal className="section-intro">
             <h2 className="display">Simple plans that grow with you</h2>
             <p>Start free. Paid plans last 30 days and never renew on their own.</p>
-          </div>
+          </Reveal>
           <div className="plans-grid">
-            {plans.map((plan) => {
+            {plans.map((plan, index) => {
               const limit = limits[plan.id];
               return (
-                <article className={`panel plan ${plan.id === "pro" ? "featured" : ""}`} key={plan.id}>
+                <Tile className={`panel plan ${plan.id === "pro" ? "featured" : ""}`} key={plan.id} delay={index * 0.08}>
                   <div className="row-actions" style={{ justifyContent: "space-between" }}>
                     <h3>{plan.name}</h3>
                     {plan.id === "pro" && <span className="badge">Most popular</span>}
@@ -255,16 +259,16 @@ export default function Home() {
                   <Link className="button" href="/register">
                     Start free
                   </Link>
-                </article>
+                </Tile>
               );
             })}
           </div>
         </section>
 
         <section id="faq" className="site-section">
-          <div className="section-intro">
+          <Reveal className="section-intro">
             <h2 className="display">Questions, answered</h2>
-          </div>
+          </Reveal>
           <div className="faq">
             {faq.map(([question, answer]) => (
               <details key={question}>
@@ -275,13 +279,13 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="cta">
+        <Reveal className="cta">
           <h2 className="display">Make your first code in a minute</h2>
           <p>Free to start. Change the destination whenever you need.</p>
           <Link className="button large" href="/register">
             Get started free <ArrowRight size={17} />
           </Link>
-        </section>
+        </Reveal>
 
         <footer className="site-footer">
           <span>
@@ -294,5 +298,6 @@ export default function Home() {
         </footer>
       </main>
     </div>
+    </SiteMotion>
   );
 }

@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
     if (!workspace || workspace.suspended) throw new ApiError(403, "This workspace is suspended.");
     if (await prisma.qRCode.count({ where: { workspaceId: key.workspaceId, deletedAt: null } }) >= limits[effectivePlan(workspace)].codes)
       throw new ApiError(409, "Your plan QR limit has been reached.");
+    if (qrData.folderId && !(await prisma.folder.findFirst({ where: { id: qrData.folderId, workspaceId: key.workspaceId } })))
+      throw new ApiError(404, "Folder not found.");
     if (campaignId && !(await prisma.campaign.findFirst({ where: { id: campaignId, workspaceId: key.workspaceId } })))
       throw new ApiError(404, "Campaign not found.");
     const tags = tagIds.length ? await prisma.tag.findMany({ where: { id: { in: tagIds }, workspaceId: key.workspaceId }, select: { id: true } }) : [];

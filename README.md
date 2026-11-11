@@ -21,7 +21,7 @@ npm run dev
 | --- | --- |
 | `npm run lint` | TypeScript |
 | `npm test` | Validation, payment signatures, QR decode for every colour and correction level |
-| `node tests/integration.mjs` | 97 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
+| `node tests/integration.mjs` | 116 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
 
 ## Structure
 
@@ -31,6 +31,7 @@ npm run dev
 | `components/Dashboard.tsx` | Panel shell: sidebar, header, New menu, command palette (Ctrl K), mobile tab bar, toasts, confirm dialog. |
 | `components/ui.tsx` | Shared types, `api()` helper, modal, theme control, motion presets. |
 | `components/Overview.tsx`, `QRCodes.tsx`, `QRStudio.tsx`, `Systems.tsx`, `Analytics.tsx` | Workspace views. `QRCodes.tsx` holds search, filters, bulk actions and the trash. |
+| `components/Books.tsx` | Book QR (a code per question, a folder per chapter) and the print sheet. |
 | `components/SiteDemo.tsx` | The live QR generator and the destination-swap demo on the home page. |
 | `components/Connect.tsx` | Tags, campaigns, webhooks, API keys. |
 | `components/Workspace.tsx` | Team, billing, audit log, settings, help, clients (platform owner). |

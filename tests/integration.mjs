@@ -455,4 +455,34 @@ check((await act("qr.bulk", { ids: Array.from({ length: 101 }, (_, i) => `id-${i
 const second = await request("/api/auth/login", { email: b.email, password });
 check((await request("/api/auth/logout-others", {}, second.cookie)).data.ended >= 1, "sign out other devices ends other sessions");
 check((await request("/api/workspace", undefined, rb.cookie)).status === 401 && (await request("/api/workspace", undefined, second.cookie)).status === 200, "only the current session survives");
+
+// --- folders (categories) and Book QR. Tenant B's live session is now `second`. ---
+const me = second.cookie;
+const shelf = (await act("folder.create", { name: "Maths" }, undefined, me)).data.entity;
+const inner = (await act("folder.create", { name: "Algebra", parentId: shelf.id }, undefined, me)).data.entity;
+check(shelf.id && inner.parentId === shelf.id, "folders nest");
+check((await act("folder.create", { name: "Intruder", parentId: shelf.id }, undefined, fresh)).status === 404, "tenant A cannot create inside tenant B's folder");
+const foreign = (await act("folder.create", { name: "A folder" }, undefined, fresh)).data.entity;
+check((await act("qr.create", { title: "Wrong shelf", targetUrl: "https://example.com/w", folderId: foreign.id }, undefined, me)).status === 404, "a code cannot be filed in another tenant's folder");
+check((await act("qr.bulk", { ids: [n1.id], op: "move", folderId: foreign.id }, undefined, me)).status === 404, "codes cannot be moved to another tenant's folder");
+check((await act("qr.bulk", { ids: [n1.id], op: "move", folderId: inner.id }, undefined, me)).status === 200, "bulk move files a code");
+const listB = (query) => request(`/api/workspace?${query}`, undefined, me);
+check((await listB(`folder=${shelf.id}`)).data.qrCodes.some((qr) => qr.id === n1.id), "a folder lists codes from its sub-folders");
+check(!(await listB("folder=none")).data.qrCodes.some((qr) => qr.id === n1.id), "the unfiled view leaves filed codes out");
+check((await act("folder.delete", undefined, shelf.id, fresh)).status === 404, "tenant A cannot delete tenant B's folder");
+check((await act("folder.delete", undefined, shelf.id, me)).status === 200, "folder delete");
+const afterDelete = await listB("folder=none");
+check(afterDelete.data.qrCodes.some((qr) => qr.id === n1.id) && !afterDelete.data.folders.some((folder) => folder.id === inner.id), "deleting a folder keeps its codes and removes sub-folders");
+const book = await act("book.create", { title: "Army GD Maths", urlTemplate: "https://example.com/book/{chapter}/{question}", chapters: [{ name: "Number system", questions: 2 }, { name: "Percentage", questions: 2 }] }, undefined, me);
+check(book.status === 200, `book creation (${book.text})`);
+const bookCodes = (await listB(`folder=${book.data.entity.id}&sort=number`)).data;
+check(bookCodes.total === 4 && bookCodes.qrCodes[3].number === bookCodes.qrCodes[0].number + 3, "a book creates one numbered code per question");
+check(bookCodes.qrCodes[3].targetUrl === "https://example.com/book/2/2" && bookCodes.qrCodes[3].title === "Percentage · Q2", "book links and titles follow chapter and question");
+check(bookCodes.folders.filter((folder) => folder.parentId === book.data.entity.id && folder.kind === "chapter").length === 2, "a book creates a folder per chapter");
+check((await request(`/s/${bookCodes.qrCodes[0].shortCode}`)).status === 302, "a book code resolves");
+const sheet = await request(`/api/workspace/export?kind=sheet&folder=${book.data.entity.id}`, undefined, me);
+check(sheet.data.codes.length === 4 && sheet.data.codes[0].payload.includes("/s/"), "print sheet lists the book's codes");
+check((await request(`/api/workspace/export?kind=sheet&folder=${book.data.entity.id}`, undefined, fresh)).status === 404, "tenant A cannot read tenant B's print sheet");
+check((await act("book.create", { title: "Too big", urlTemplate: "https://example.com/{chapter}/{question}", chapters: [{ name: "One", questions: 200 }] }, undefined, me)).status === 409, "a book cannot exceed the plan's code limit");
+check((await act("book.create", { title: "Bad link", urlTemplate: "http://127.0.0.1/{chapter}/{question}", chapters: [{ name: "One", questions: 1 }] }, undefined, me)).status === 400, "a book link must be a public address");
 console.log(`${passed} integration checks passed.`);

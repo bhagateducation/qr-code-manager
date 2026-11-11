@@ -50,6 +50,11 @@ export async function POST(
       const data = z
         .object({ email, password, name, workspace: name })
         .parse(input);
+      // The owner address can only be registered by someone who also holds the secret from the hosting
+      // environment; otherwise anyone who knows the address could claim the platform on a new install.
+      const claimsOwner = data.email === process.env.OWNER_EMAIL?.toLowerCase() && !(await prisma.user.count({ where: { platformAdmin: true } }));
+      if (claimsOwner && (!process.env.OWNER_INITIAL_PASSWORD || data.password !== process.env.OWNER_INITIAL_PASSWORD))
+        throw new ApiError(403, "This address is reserved for the platform owner. Set OWNER_INITIAL_PASSWORD in the hosting environment and register with that password.");
       const passwordHash = await hashPassword(data.password);
       const verificationToken = `verify_${randomBytes(32).toString("base64url")}`;
       user = await prisma.user.create({
@@ -60,6 +65,7 @@ export async function POST(
           emailVerificationTokenHash: createHash("sha256").update(verificationToken).digest("hex"),
           emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           role: "owner",
+          platformAdmin: claimsOwner,
           workspace: {
             create: {
               name: data.workspace,
