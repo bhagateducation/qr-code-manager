@@ -1,50 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, MotionConfig, motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { ArrowRight, Contact, Link2, QrCode, Wifi } from "lucide-react";
-
-const ease = [0.22, 1, 0.36, 1] as const;
-
-/** Honours the visitor's reduced-motion setting for every animation on the page. */
-export function SiteMotion({ children }: { children: React.ReactNode }) {
-  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
-}
-
-/** Thin bar under the header that fills as the page is read. */
-export function ScrollBar() {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, { stiffness: 140, damping: 26 });
-  return <motion.div className="scroll-bar" style={{ scaleX }} aria-hidden />;
-}
-
-/** A block that rises in when scrolled to and leans a few degrees toward the mouse. */
-export function Tile({ className, style, delay = 0, children }: { className?: string; style?: React.CSSProperties; delay?: number; children: React.ReactNode }) {
-  const still = useReducedMotion();
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [5, -5]), { stiffness: 220, damping: 22 });
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-5, 5]), { stiffness: 220, damping: 22 });
-  return (
-    <motion.div
-      className={className}
-      style={{ ...style, rotateX, rotateY, transformPerspective: 1000 }}
-      initial={{ opacity: 0, y: 32 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.6, delay, ease }}
-      onPointerMove={(event) => {
-        if (still || event.pointerType !== "mouse") return;
-        const box = event.currentTarget.getBoundingClientRect();
-        x.set((event.clientX - box.left) / box.width - 0.5);
-        y.set((event.clientY - box.top) / box.height - 0.5);
-      }}
-      onPointerLeave={() => (x.set(0), y.set(0))}
-    >
-      {children}
-    </motion.div>
-  );
-}
 
 const kinds = [
   { id: "link", label: "Link", icon: Link2, tone: "var(--c-blue)", field: "Website address", start: "yourshop.com/menu", note: "In your workspace this becomes a dynamic code: change where it leads later without reprinting." },
@@ -52,7 +9,7 @@ const kinds = [
   { id: "card", label: "Contact", icon: Contact, tone: "var(--c-pink)", field: "Full name", start: "Asha Verma", note: "One scan saves your name, phone and email to their phone." },
 ] as const;
 const payload = (kind: string, value: string) =>
-  kind === "wifi" ? `WIFI:T:WPA;S:${value};P:welcome123;H:false;;` : kind === "card" ? `BEGIN:VCARD\nVERSION:3.0\nFN:${value}\nEND:VCARD` : /^https?:\/\//.test(value) ? value : `https://${value}`;
+  kind === "wifi" ? `WIFI:T:nopass;S:${value};H:false;;` : kind === "card" ? `BEGIN:VCARD\nVERSION:3.0\nFN:${value}\nEND:VCARD` : /^https?:\/\//.test(value) ? value : `https://${value}`;
 
 /** A real generator on the home page: what you type is the code you see. */
 export function LiveDemo() {
@@ -78,9 +35,9 @@ export function LiveDemo() {
   }, [kind, value]);
   return (
     <div className="demo" style={{ "--tone": kind.tone } as React.CSSProperties}>
-      <motion.span className="demo-float a" animate={{ y: [0, -7, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}>
+      <span className="demo-float a">
         <i /> Scan-tested before download
-      </motion.span>
+      </span>
       <div className="demo-tabs" role="group" aria-label="Code type">
         {kinds.map((item) => (
           <button
@@ -102,9 +59,9 @@ export function LiveDemo() {
       <div className="demo-stage">
         <div className="demo-qr">
           {path.d ? (
-            <motion.svg key={kind.id} initial={{ opacity: 0, scale: 0.9, rotate: -4 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: 0.4, ease }} viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`QR code for ${value}`} shapeRendering="crispEdges">
+            <svg viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`QR code for ${value}`} shapeRendering="crispEdges">
               <path d={path.d} fill="#15161a" />
-            </motion.svg>
+            </svg>
           ) : (
             <QrCode size={64} color="#c9ccd3" />
           )}
@@ -117,9 +74,9 @@ export function LiveDemo() {
           </Link>
         </div>
       </div>
-      <motion.span className="demo-float b" animate={{ y: [0, 7, 0] }} transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}>
+      <span className="demo-float b">
         <QrCode size={14} /> QR-00042 · Summer menu
-      </motion.span>
+      </span>
     </div>
   );
 }
@@ -143,11 +100,7 @@ export function SwapDemo() {
       <div className="swap-line">
         <span className="badge">Leads to</span>
         <span className="grow" style={{ overflow: "hidden", minHeight: 20 }}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.code key={index} style={{ display: "block" }} initial={{ y: 14, opacity: 0, filter: "blur(4px)" }} animate={{ y: 0, opacity: 1, filter: "blur(0px)" }} exit={{ y: -14, opacity: 0, filter: "blur(4px)" }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-              {destinations[index]}
-            </motion.code>
-          </AnimatePresence>
+          <code className="swap-destination">{destinations[index]}</code>
         </span>
         <small>edit any time</small>
       </div>

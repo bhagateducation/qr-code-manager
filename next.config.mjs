@@ -20,7 +20,12 @@ export default {
   poweredByHeader: false,
   output: "standalone",
   async headers() {
-    return [{ source: "/:path*", headers: security }];
+    return [
+      { source: "/:path*", headers: security },
+      { source: "/", headers: [
+        { key: "Link", value: '</llms.txt>; rel="describedby"; type="text/plain", </home.md>; rel="alternate"; type="text/markdown"' },
+      ] },
+    ];
   },
   async redirects() {
     return [

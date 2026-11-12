@@ -5,8 +5,9 @@ import { BRAND } from "@/lib/brand";
 import { getPublicPlans, getSite } from "@/lib/site";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { checkoutConfigured } from "@/lib/payments";
-import Reveal from "@/components/Reveal";
-import { LiveDemo, ScrollBar, SiteMotion, SwapDemo, Tile } from "@/components/SiteDemo";
+import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
+import AgentTool from "@/components/AgentTool";
+import { COMPANY, CONTACT_EMAIL, COMPANY_URL, TERMS_URL, PROFILES, DESCRIPTION } from "@/lib/public-discovery";
 import { ThemeControl } from "@/components/ui";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
@@ -15,7 +16,7 @@ const week = [38, 52, 44, 71, 63, 88, 100];
 export const revalidate = 60;
 
 const title = `${BRAND} — Dynamic QR codes for your business`;
-const description = "Create dynamic QR codes, change their destinations after printing, and track scans from one workspace.";
+const description = DESCRIPTION;
 const siteOrigin = getSiteOrigin();
 
 export const metadata: Metadata = {
@@ -36,21 +37,31 @@ export default async function Home() {
   const demoLink = site.show.features ? "#features" : site.show.steps ? "#how-it-works" : null;
   const structuredData = siteOrigin && JSON.stringify({
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: BRAND,
-    url: siteOrigin.href,
+    "@graph": [
+      { "@type": "Organization", "@id": new URL("#organization", siteOrigin).href,
+        name: COMPANY, url: COMPANY_URL, email: CONTACT_EMAIL, sameAs: PROFILES },
+      { "@type": "WebSite", name: BRAND, url: siteOrigin.href,
+        publisher: { "@id": new URL("#organization", siteOrigin).href } },
+      { "@type": "SoftwareApplication", name: BRAND, url: siteOrigin.href,
+        description, applicationCategory: "BusinessApplication", operatingSystem: "Web",
+        publisher: { "@id": new URL("#organization", siteOrigin).href } },
+      ...(site.show.faq && site.faq.length ? [{
+        "@type": "FAQPage", mainEntity: site.faq.map(({ q, a }) => ({
+          "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a },
+        })),
+      }] : []),
+    ],
   }).replace(/</g, "\\u003c");
   const checkoutReady = checkoutConfigured();
   const free = plans.find((plan) => plan.id === "free");
   // The plan in the middle is highlighted, as the usual pick.
   const featured = plans.length > 2 ? plans[Math.floor(plans.length / 2)].id : plans.at(-1)?.id;
   return (
-    <SiteMotion>
     <div className="site">
+      <AgentTool />
       {structuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />}
       <a href="#main-content" className="site-skip button primary">Skip to content</a>
       <header className="site-nav">
-        <ScrollBar />
         <div>
           <Link href="/" className="brand">
             <span className="brand-mark">
@@ -79,7 +90,7 @@ export default async function Home() {
 
       <main id="main-content" className="wrap" tabIndex={-1}>
         <section className="hero">
-          <Reveal className="hero-copy">
+          <div className="hero-copy">
             <h1 className="display">
               {site.heroLine1}
               <br />
@@ -104,10 +115,10 @@ export default async function Home() {
                 <Check size={15} /> No card needed
               </span>
             </div>
-          </Reveal>
-          <Reveal delay={0.1}>
+          </div>
+          <div>
             <LiveDemo />
-          </Reveal>
+          </div>
         </section>
 
         <div className="marquee">
@@ -118,19 +129,19 @@ export default async function Home() {
 
         {site.show.features && (
         <section id="features" className="site-section">
-          <Reveal className="section-intro">
+          <div className="section-intro">
             <h2 className="display">Everything a code needs after it is printed</h2>
             <p>Codes, destinations, business records and scan activity live in one workspace, so nothing gets lost between tools.</p>
-          </Reveal>
+          </div>
           <div className="bento">
-            <Tile className="tile w4" style={tone("var(--c-blue)")} delay={0.00}>
+            <div className="tile w4" style={tone("var(--c-blue)")}>
               <h3>Change the link. Keep the print.</h3>
               <p>Menus change, campaigns end, websites move. Point the same printed code somewhere new, pause it, or give it an end date.</p>
               <div className="tile-art">
                 <SwapDemo />
               </div>
-            </Tile>
-            <Tile className="tile w2" style={tone("var(--c-green)")} delay={0.08}>
+            </div>
+            <div className="tile w2" style={tone("var(--c-green)")}>
               <h3>See every scan</h3>
               <p>Scans per day, busiest hours, devices and your top codes. Export it all to CSV.</p>
               <div className="tile-art bars" style={{ height: 96, paddingTop: 0 }} aria-hidden>
@@ -140,8 +151,8 @@ export default async function Home() {
                   </div>
                 ))}
               </div>
-            </Tile>
-            <Tile className="tile w2" style={tone("var(--c-amber)")} delay={0.16}>
+            </div>
+            <div className="tile w2" style={tone("var(--c-amber)")}>
               <h3>Find one among thousands</h3>
               <p>Every code has a number. Search by number, name or link, then filter and act in bulk.</p>
               <div className="tile-art mock" aria-hidden>
@@ -157,8 +168,8 @@ export default async function Home() {
                   <span className="status active">Active</span>
                 </div>
               </div>
-            </Tile>
-            <Tile className="tile w2" style={tone("var(--c-violet)")} delay={0.00}>
+            </div>
+            <div className="tile w2" style={tone("var(--c-violet)")}>
               <h3>Route by device</h3>
               <p>One code, the right place for each phone.</p>
               <div className="tile-art route" aria-hidden>
@@ -173,8 +184,8 @@ export default async function Home() {
                 <span>Everyone else</span>
                 <em>Your website</em>
               </div>
-            </Tile>
-            <Tile className="tile w2" style={tone("var(--c-pink)")} delay={0.08}>
+            </div>
+            <div className="tile w2" style={tone("var(--c-pink)")}>
               <h3>Records with public pages</h3>
               <p>Build your own tables for products, assets or members. Publish a record and a code can open it.</p>
               <div className="tile-art mock" aria-hidden>
@@ -189,8 +200,8 @@ export default async function Home() {
                   350 ml
                 </div>
               </div>
-            </Tile>
-            <Tile className="tile w3" style={tone("var(--c-sky)")} delay={0.16}>
+            </div>
+            <div className="tile w3" style={tone("var(--c-sky)")}>
               <h3>Built for teams</h3>
               <p>Invite people as admin, editor or viewer. Every change is written to an audit log, so you always know who did what.</p>
               <div className="tile-art chips" aria-hidden>
@@ -200,35 +211,35 @@ export default async function Home() {
                   </span>
                 ))}
               </div>
-            </Tile>
-            <Tile className="tile w3" style={tone("var(--c-teal)")} delay={0.00}>
+            </div>
+            <div className="tile w3" style={tone("var(--c-teal)")}>
               <h3>API and webhooks</h3>
               <p>Create codes from your own software and receive a signed event the moment one is scanned.</p>
               <pre className="snippet tile-art" aria-hidden>{`POST /api/v1/qr
 { "title": "Spring menu",
   "targetUrl": "https://yourshop.com/menu" }`}</pre>
-            </Tile>
+            </div>
           </div>
         </section>
         )}
 
         {site.show.steps && (
         <section id="how-it-works" className="site-section">
-          <Reveal className="section-intro">
+          <div className="section-intro">
             <h2 className="display">Working code in three steps</h2>
-          </Reveal>
+          </div>
           <ol className="steps">
             {[
               { icon: PencilLine, tone: "var(--c-blue)", title: "Create", text: "Name your code and paste a link, a Wi-Fi network or a contact." },
               { icon: Download, tone: "var(--c-violet)", title: "Download and print", text: "Every image is scan-tested before you get it, as PNG or vector SVG." },
               { icon: ScanLine, tone: "var(--c-green)", title: "Update and measure", text: "Change the destination whenever you need and watch the scans arrive." },
-            ].map((step, index) => (
+            ].map((step) => (
               <li className="step" key={step.title}>
-                <Reveal delay={index * 0.1}>
+                <div>
                 <step.icon className="tone" style={tone(step.tone)} />
                 <h3>{step.title}</h3>
                 <p>{step.text}</p>
-                </Reveal>
+                </div>
               </li>
             ))}
           </ol>
@@ -237,17 +248,17 @@ export default async function Home() {
 
         {site.show.safety && (
         <section className="site-section">
-          <Reveal className="section-intro">
+          <div className="section-intro">
             <h2 className="display">Safe by default</h2>
             <p>Your codes are printed on real things. Losing or leaking them is not an option.</p>
-          </Reveal>
+          </div>
           <div className="three-col">
             {[
               { icon: ShieldCheck, tone: "var(--c-green)", title: "Two-step sign-in", text: "Protect every account with an authenticator app and one-time backup codes." },
               { icon: Trash2, tone: "var(--c-orange)", title: "30-day trash", text: "Deleted codes can be restored for a month. Only owners and admins can remove them for good." },
               { icon: Users, tone: "var(--c-sky)", title: "Separate workspaces", text: "Each business has its own workspace. Access is checked on the server for every request." },
-            ].map((item, index) => (
-              <Reveal key={item.title} delay={index * 0.1} className="row-actions safe-point">
+            ].map((item) => (
+              <div key={item.title} className="row-actions safe-point">
                 <span className="page-icon" style={tone(item.tone)}>
                   <item.icon size={20} />
                 </span>
@@ -257,7 +268,7 @@ export default async function Home() {
                     {item.text}
                   </p>
                 </div>
-              </Reveal>
+              </div>
             ))}
           </div>
         </section>
@@ -265,16 +276,16 @@ export default async function Home() {
 
         {site.show.pricing && plans.length > 0 && (
         <section id="pricing" className="site-section">
-          <Reveal className="section-intro">
+          <div className="section-intro">
             <h2 className="display">Simple plans that grow with you</h2>
             <p>{checkoutReady
               ? "Start free. Paid plans run for their period and never renew on their own."
               : "Free accounts are available. Online checkout for paid plans is currently unavailable."}</p>
-          </Reveal>
+          </div>
           <div className="plans-grid">
-            {plans.map((plan, index) => {
+            {plans.map((plan) => {
               return (
-                <Tile className={`panel plan ${plan.id === featured ? "featured" : ""}`} key={plan.id} delay={index * 0.08}>
+                <div className={`panel plan ${plan.id === featured ? "featured" : ""}`} key={plan.id}>
                   <div className="row-actions" style={{ justifyContent: "space-between" }}>
                     <h3>{plan.name}</h3>
                     {plan.id === featured && <span className="badge">Most popular</span>}
@@ -294,7 +305,7 @@ export default async function Home() {
                   <Link className="button" href="/register">
                     Start free
                   </Link>
-                </Tile>
+                </div>
               );
             })}
           </div>
@@ -303,9 +314,9 @@ export default async function Home() {
 
         {site.show.faq && site.faq.length > 0 && (
         <section id="faq" className="site-section">
-          <Reveal className="section-intro">
+          <div className="section-intro">
             <h2 className="display">Questions, answered</h2>
-          </Reveal>
+          </div>
           <div className="faq">
             {site.faq.map((item) => (
               <details key={item.q}>
@@ -317,25 +328,28 @@ export default async function Home() {
         </section>
         )}
 
-        <Reveal className="cta">
+        <div className="cta">
           <h2 className="display">{site.ctaTitle}</h2>
           <p>{site.ctaText}</p>
           <Link className="button large" href="/register">
             Get started free <ArrowRight size={17} />
           </Link>
-        </Reveal>
+        </div>
 
         <footer className="site-footer">
           <span>
             © {new Date().getFullYear()} {BRAND}
           </span>
           <span className="row-actions">
+            <Link href="/about">About</Link>
+            <Link href="/contact">Contact</Link>
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+            <a href={TERMS_URL}>Bhagat Education terms</a>
             <Link href="/login">Sign in</Link>
             <Link href="/register">Create account</Link>
           </span>
         </footer>
       </main>
     </div>
-    </SiteMotion>
   );
 }

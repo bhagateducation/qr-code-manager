@@ -695,3 +695,8 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
   .dns { grid-template-columns: minmax(0, 1fr); }
   .folder-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Keep the demo box stable while the generated SVG replaces its placeholder. */
+.demo-qr { position: relative; min-width: 0; }
+.demo-qr svg { position: absolute; inset: 10px; width: calc(100% - 20px); height: calc(100% - 20px); }
+.swap-destination { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
