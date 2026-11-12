@@ -23,12 +23,14 @@ function isPublicAddress(address: string, family: number) {
   return family === 6 && globalIpv6.check(address, "ipv6") && !blocked.check(address, "ipv6");
 }
 
-const lookupPublicAddress: LookupFunction = (hostname, _options, callback) => {
+const lookupPublicAddress: LookupFunction = (hostname, options, callback) => {
   lookup(hostname, { all: true }, (error, addresses) => {
     if (error) return callback(error, "", 0);
-    const address = addresses.find(({ address, family }) => isPublicAddress(address, family));
-    if (!address) return callback(new Error("Destination has no public address"), "", 0);
-    callback(null, address.address, address.family);
+    const publicAddresses = addresses.filter(({ address, family }) => isPublicAddress(address, family));
+    const first = publicAddresses[0];
+    if (!first) return callback(new Error("Destination has no public address"), "", 0);
+    if (options.all) return callback(null, publicAddresses);
+    callback(null, first.address, first.family);
   });
 };
 
@@ -53,7 +55,6 @@ export async function requestPublicUrl(
       method: options.body === undefined ? "GET" : "POST",
       headers: options.headers,
       agent: false,
-      autoSelectFamily: false,
       lookup: lookupPublicAddress,
       signal: AbortSignal.timeout(options.timeout),
     }, resolve);
