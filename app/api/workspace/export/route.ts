@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize, failure, ApiError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { account, linkBase } from "@/lib/plans";
 
 function csvCell(value: unknown) {
   let text = String(value ?? "");
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await authorize();
     const kind = request.nextUrl.searchParams.get("kind") || "qr";
+    const base = linkBase((await account(prisma, user.workspace)).root);
     if (kind === "qr") {
       const rows = await prisma.qRCode.findMany({
         where: { workspaceId: user.workspaceId, deletedAt: null },
@@ -24,11 +26,12 @@ export async function GET(request: NextRequest) {
         take: 50000,
       });
       const content = csv([
-        ["Number", "Title", "Type", "Short code", "Destination or payload", "Status", "Scans", "Campaign", "Tags", "Created"],
+        ["Number", "Title", "Type", "QR link", "Short code", "Destination or payload", "Status", "Scans", "Campaign", "Tags", "Created"],
         ...rows.map((qr) => [
           qr.number,
           qr.title,
           qr.type,
+          qr.type === "dynamic_url" ? `${base}/s/${qr.shortCode}` : "",
           qr.shortCode,
           qr.targetUrl,
           qr.isActive ? "Active" : "Paused",
@@ -59,7 +62,7 @@ export async function GET(request: NextRequest) {
         select: { number: true, title: true, type: true, shortCode: true, targetUrl: true },
       });
       return NextResponse.json(
-        { title: root.name, codes: rows.map((qr) => ({ number: qr.number, title: qr.title, payload: qr.type === "dynamic_url" ? `${process.env.APP_URL}/s/${qr.shortCode}` : qr.targetUrl })) },
+        { title: root.name, codes: rows.map((qr) => ({ number: qr.number, title: qr.title, payload: qr.type === "dynamic_url" ? `${base}/s/${qr.shortCode}` : qr.targetUrl })) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }

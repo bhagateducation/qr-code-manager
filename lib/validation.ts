@@ -124,21 +124,8 @@ export function validateRecord(
   }
   return data;
 }
-export function effectivePlan(workspace: {
-  plan: string;
-  paidUntil: Date | null;
-}) {
-  return workspace.paidUntil &&
-    workspace.paidUntil > new Date() &&
-    ["pro", "business"].includes(workspace.plan)
-    ? workspace.plan
-    : "free";
+/** The plan in force: "owner" always, a paid plan until it lapses, otherwise "free". */
+export function effectivePlan(workspace: { plan: string; paidUntil: Date | null }) {
+  if (workspace.plan === "owner") return "owner";
+  return workspace.plan !== "free" && workspace.paidUntil && workspace.paidUntil > new Date() ? workspace.plan : "free";
 }
-export const limits: Record<
-  string,
-  { codes: number; systems: number; records: number }
-> = {
-  free: { codes: 10, systems: 1, records: 50 },
-  pro: { codes: 500, systems: 10, records: 5000 },
-  business: { codes: 2500, systems: 50, records: 25000 },
-};

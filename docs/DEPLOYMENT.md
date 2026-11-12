@@ -32,6 +32,10 @@ For a generic Node host, copy `.next/static` into `.next/standalone/.next/static
 
 Run `npm run release` to create a clean source directory at `release/qr-manager` for Hostinger's deploy tool. The script copies only application/config/schema/bootstrap files, excluding local secrets, test databases, dependencies, tests and built assets. Point the Hostinger deploy operation at that directory with type `nodejs`, appType `next`, nodeVersion `22` or `24`, and buildScript `build`.
 
+## Client custom domains
+
+A client's domain only reaches the app once it is connected to this Hostinger website as an extra (alias) domain, in addition to the client's CNAME and TXT records. Check the Clients list for domains waiting, then add each one in hPanel (Websites → this site → Domains). Until then its Check stays red and its codes keep using the main domain.
+
 ## Upgrading an existing database
 
 Migration `202611100001_numbering_trash` adds QR numbers and the trash. It numbers existing codes in creation order with a window function, so it needs MySQL 8 or MariaDB 10.2 or newer. It was applied successfully to the live Hostinger MySQL database on 2026-11-10. On any other existing database, back up before the first build that applies it.

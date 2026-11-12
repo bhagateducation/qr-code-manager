@@ -14,7 +14,10 @@ import {
   revokeSession,
   revokeOtherSessions,
   getSessionUser,
+  canEnter,
+  digest,
 } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { verifyTotp } from "@/lib/mfa";
 import { emailDeliveryConfigured, sendEmailVerificationEmail } from "@/lib/email";
 import { createHash } from "node:crypto";
@@ -31,6 +34,19 @@ export async function POST(
       const response = json({ ok: true });
       response.cookies.set(COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 });
       return response;
+    }
+    if (action === "switch") {
+      const current = await getSessionUser();
+      if (!current) throw new ApiError(401, "Sign in to continue.");
+      const target = z.object({ workspaceId: z.string().max(100).nullable() }).parse(input).workspaceId;
+      if (target && target !== current.homeWorkspaceId) {
+        const panel = await prisma.workspace.findUnique({ where: { id: target } });
+        if (!panel || !canEnter({ ...current, workspaceId: current.homeWorkspaceId }, panel)) throw new ApiError(404, "Panel not found.");
+        await prisma.auditLog.create({ data: { workspaceId: panel.id, actorId: current.id, action: current.platformAdmin && panel.parentId !== current.homeWorkspaceId ? "platform.enter" : "panel.enter" } });
+      }
+      const token = (await cookies()).get(COOKIE_NAME)?.value || "";
+      await prisma.session.update({ where: { tokenHash: digest(token) }, data: { workspaceId: target && target !== current.homeWorkspaceId ? target : null } });
+      return json({ ok: true });
     }
     if (action === "logout-others") {
       const current = await getSessionUser();

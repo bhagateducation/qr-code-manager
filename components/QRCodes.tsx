@@ -1,8 +1,9 @@
 "use client";
 import { Fragment, useEffect, useState } from "react";
-import { ArrowUpRight, ChevronRight, Copy, Download, Folder as FolderIcon, FolderPlus, Pause, Pencil, Play, Plus, Printer, QrCode, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ArrowUpRight, ChevronRight, ClipboardCopy, Copy, CopyPlus, Download, Folder as FolderIcon, FolderPlus, Pause, Pencil, Play, Plus, Printer, QrCode, RotateCcw, Search, Trash2, Upload, X } from "lucide-react";
+import { parseCsv } from "@/lib/csv";
 import { PrintSheet } from "./Books";
-import { Ctx, Empty, Filters, QR, folderPath, folderTrail, formatDate, noFilters, qrNumber } from "./ui";
+import { Ctx, Empty, Filters, Info, QR, api, copyImage, downloadBlob, folderPath, folderTrail, formatDate, noFilters, qrNumber, qrPng, useLabelPref } from "./ui";
 
 const typeLabel: Record<string, string> = { dynamic_url: "Website link", wifi: "Wi-Fi", vcard: "Contact card", text: "Plain text" };
 const TRASH_DAYS = 30;
@@ -22,7 +23,9 @@ export default function QRCodes({
   setFilters: (filters: Filters) => void;
   openStudio: (qr: QR | null) => void;
 }) {
-  const { data, canWrite, isAdmin, mutate, notify, ask } = ctx;
+  const { data, canWrite, isAdmin, mutate, notify, ask, reload } = ctx;
+  const [withLabel, setWithLabel] = useLabelPref();
+  const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState(filters.search);
   const [selected, setSelected] = useState<string[]>([]);
   const [naming, setNaming] = useState<string | null>(null);
@@ -58,9 +61,10 @@ export default function QRCodes({
       await mutate("folder.delete", undefined, folder.id).then(() => set({ folder: folder.parentId || "" }), () => {});
   }
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
-  const narrowed = filters.search || filters.tag || filters.campaign || filters.type || filters.folder || (filters.status && !inTrash);
+  const narrowed = filters.search || filters.tag || filters.type || filters.folder || (filters.status && !inTrash);
   const allSelected = data.qrCodes.length > 0 && selected.length === data.qrCodes.length;
-  const link = (qr: QR) => `${data.appUrl}/s/${qr.shortCode}`;
+  const link = (qr: QR) => `${data.linkBase}/s/${qr.shortCode}`;
+  const image = (qr: QR) => qrPng(!qr.type || qr.type === "dynamic_url" ? link(qr) : qr.targetUrl, qr.styling, withLabel ? { title: qr.title, number: qr.number } : null);
   const copy = (qr: QR) =>
     navigator.clipboard
       .writeText(link(qr))
@@ -68,18 +72,34 @@ export default function QRCodes({
       .catch(() => notify("Copy is blocked by this browser.", "error"));
   async function download(qr: QR) {
     try {
-      const { default: QRCode } = await import("qrcode");
-      const anchor = document.createElement("a");
-      anchor.href = await QRCode.toDataURL(!qr.type || qr.type === "dynamic_url" ? link(qr) : qr.targetUrl, {
-        width: 1024,
-        margin: 4,
-        errorCorrectionLevel: (qr.styling?.errorCorrectionLevel as "M") || "M",
-        color: { dark: qr.styling?.dark || "#17161D", light: "#FFFFFF" },
-      });
-      anchor.download = `${qrNumber(qr.number)}-${qr.title.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60)}.png`;
-      anchor.click();
+      downloadBlob(await image(qr), `${qrNumber(qr.number)}-${qr.title.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60)}.png`);
     } catch {
       notify("The image could not be generated. Open the code and try there.", "error");
+    }
+  }
+  const copyQr = (qr: QR) =>
+    copyImage(image(qr))
+      .then(() => notify("QR image copied. Paste it anywhere."))
+      .catch((e) => notify(e.message, "error"));
+  // Rows go up in batches of 250 so each request stays small; a failure says how far it got.
+  async function importCsv(file: File) {
+    const rows = parseCsv(await file.text());
+    const body = (rows[0]?.[0]?.trim().toLowerCase() === "title" ? rows.slice(1) : rows).map(([title = "", url = "", folderName = ""]) => ({ title: title.trim(), url: url.trim(), folder: folderName.trim() }));
+    if (!body.length) return notify("That file has no rows to import.", "error");
+    if (body.length > 5000) return notify("Import up to 5,000 rows at a time.", "error");
+    setImporting(true);
+    let done = 0;
+    try {
+      for (let i = 0; i < body.length; i += 250) {
+        await api("/api/workspace", { action: "qr.import", data: body.slice(i, i + 250) });
+        done += Math.min(250, body.length - i);
+      }
+      notify(`Imported ${done} codes.`);
+    } catch (e) {
+      notify(`${(e as Error).message} ${done} of ${body.length} rows were imported before this.`, "error");
+    } finally {
+      setImporting(false);
+      await reload();
     }
   }
   async function bulk(op: "pause" | "resume" | "trash" | "restore" | "purge", ids = selected) {
@@ -121,9 +141,18 @@ export default function QRCodes({
               </button>
             )
           : (
-            <a className="button" href="/api/workspace/export?kind=qr" download>
-              <Download size={15} /> <span className="hide-sm">Export CSV</span>
-            </a>
+            <>
+              {canWrite && (
+                <label className="button" style={{ cursor: "pointer" }}>
+                  <Upload size={15} /> <span className="hide-sm">{importing ? "Importing…" : "Import CSV"}</span>
+                  <input type="file" accept=".csv,text/csv" hidden disabled={importing} onChange={(event) => (event.target.files?.[0] && importCsv(event.target.files[0]), (event.target.value = ""))} />
+                </label>
+              )}
+              <Info text="Import: a CSV with columns title, url and (optional) folder — one row per code, up to 5,000 rows. Folders named in the file are created at the top level. Export downloads every code with its number and link." />
+              <a className="button" href="/api/workspace/export?kind=qr" download>
+                <Download size={15} /> <span className="hide-sm">Export CSV</span>
+              </a>
+            </>
           )}
       </div>
 
@@ -139,12 +168,6 @@ export default function QRCodes({
                 {item.name}
               </button>
             </Fragment>
-          ))}
-          {subfolders.length > 0 && <span className="folder-divider" />}
-          {subfolders.map((item) => (
-            <button className="chip" key={item.id} onClick={() => set({ folder: item.id })}>
-              <FolderIcon size={13} /> {item.name} <small className="num">{deepCount(item.id)}</small>
-            </button>
           ))}
           {!folder && data.folders.length > 0 && (
             <button className="chip" aria-pressed={filters.folder === "none"} onClick={() => set({ folder: "none" })}>
@@ -184,7 +207,18 @@ export default function QRCodes({
             ))}
         </div>
       )}
-      {printing && folder && <PrintSheet folderId={folder.id} onClose={() => setPrinting(false)} notify={notify} />}
+      {!inTrash && !filters.search && subfolders.length > 0 && (
+        <div className="folder-grid">
+          {subfolders.map((item) => (
+            <button key={item.id} className={`folder-tile ${item.kind === "book" ? "book" : ""}`} title={folderPath(data.folders, item.id)} onDoubleClick={() => set({ folder: item.id })} onClick={() => set({ folder: item.id })}>
+              <FolderIcon strokeWidth={1.4} />
+              <strong>{item.name}</strong>
+              <small className="num">{deepCount(item.id).toLocaleString()} codes</small>
+            </button>
+          ))}
+        </div>
+      )}
+      {printing && folder && <PrintSheet folderId={folder.id} onClose={() => setPrinting(false)} notify={notify} label={withLabel} />}
 
       <div className="toolbar filters">
         {selected.length ? (
@@ -239,16 +273,6 @@ export default function QRCodes({
                     </option>
                   ))}
                 </select>
-                {data.campaigns.length > 0 && (
-                  <select aria-label="Campaign" value={filters.campaign} onChange={(e) => set({ campaign: e.target.value })}>
-                    <option value="">All campaigns</option>
-                    {data.campaigns.map((campaign) => (
-                      <option key={campaign.id} value={campaign.id}>
-                        {campaign.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
                 {data.tags.length > 0 && (
                   <select aria-label="Tag" value={filters.tag} onChange={(e) => set({ tag: e.target.value })}>
                     <option value="">All tags</option>
@@ -274,6 +298,11 @@ export default function QRCodes({
               </button>
             )}
             <span className="grow" />
+            <label className="toggle-row">
+              <input type="checkbox" checked={withLabel} onChange={(event) => setWithLabel(event.target.checked)} />
+              Name and number on images
+              <Info text="When on, copied images, downloaded PNGs and print sheets show each code's name and number under the QR. When off you get the plain QR." />
+            </label>
             <small className="num">
               {data.total.toLocaleString()} {data.total === 1 ? "result" : "results"}
             </small>
@@ -318,7 +347,6 @@ export default function QRCodes({
                         {qr.title}
                         <small className="num">
                           {qrNumber(qr.number)}
-                          {qr.campaign ? ` · ${qr.campaign.name}` : ""}
                           {qr.tags?.length ? ` · ${qr.tags.map((item) => item.tag.name).join(", ")}` : ""}
                         </small>
                       </span>
@@ -366,6 +394,9 @@ export default function QRCodes({
                         )
                       ) : (
                         <>
+                          <button className="icon-button" title="Copy QR image" aria-label={`Copy QR image of ${qr.title}`} onClick={() => copyQr(qr)}>
+                            <ClipboardCopy size={16} />
+                          </button>
                           <button className="icon-button" title="Copy QR link" aria-label={`Copy link for ${qr.title}`} onClick={() => copy(qr)}>
                             <Copy size={16} />
                           </button>
@@ -375,6 +406,11 @@ export default function QRCodes({
                           <button className="icon-button" title={canWrite ? "Edit" : "View"} aria-label={`Open ${qr.title}`} onClick={() => openStudio(qr)}>
                             <Pencil size={16} />
                           </button>
+                          {canWrite && (
+                            <button className="icon-button" title="Duplicate" aria-label={`Duplicate ${qr.title}`} onClick={() => void mutate("qr.duplicate", undefined, qr.id).catch(() => {})}>
+                              <CopyPlus size={16} />
+                            </button>
+                          )}
                           {canWrite && (
                             <button className="icon-button danger" title="Move to trash" aria-label={`Move ${qr.title} to trash`} onClick={() => bulk("trash", [qr.id])}>
                               <Trash2 size={16} />

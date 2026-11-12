@@ -1,6 +1,6 @@
 "use client";
 import { FormEvent, useState } from "react";
-import { Code2, KeyRound, Megaphone, Plus, Tag, Trash2 } from "lucide-react";
+import { Code2, KeyRound, Plus, Tag, Trash2 } from "lucide-react";
 import { Ctx, Empty, Secret, formatDate, formatDateTime } from "./ui";
 
 /** Runs a create form: disables the button while saving and clears the form on success. */
@@ -58,58 +58,6 @@ export function Tags({ ctx }: { ctx: Ctx }) {
           ))}
         </div>
         {!data.tags.length && <Empty icon={Tag} title="No tags yet" text="Tags are colour labels you attach to QR codes to keep them organised." />}
-      </div>
-    </div>
-  );
-}
-
-export function Campaigns({ ctx }: { ctx: Ctx }) {
-  const { data, canWrite, mutate, ask } = ctx;
-  const { busy, submit } = useCreate((form) => mutate("campaign.create", { name: form.get("name"), description: form.get("description") || undefined, status: "active" }));
-  return (
-    <div className="page-stack">
-      {canWrite && (
-        <form className="panel inline-form" onSubmit={submit}>
-          <label>
-            Campaign name
-            <input name="name" required maxLength={100} placeholder="e.g. Diwali offer" />
-          </label>
-          <label>
-            Description
-            <input name="description" maxLength={500} placeholder="Optional" />
-          </label>
-          <button className="button primary" disabled={busy}>
-            <Plus size={16} /> Create campaign
-          </button>
-        </form>
-      )}
-      <div className="panel">
-        <div className="feature-list">
-          {data.campaigns.map((campaign) => (
-            <div className="feature-row" key={campaign.id}>
-              <div>
-                <strong>{campaign.name}</strong>
-                <small>{campaign.description || `Created ${formatDate(campaign.createdAt)}`}</small>
-              </div>
-              {canWrite ? (
-                <>
-                  <select aria-label={`Status of ${campaign.name}`} value={campaign.status} onChange={(event) => void mutate("campaign.status", { status: event.target.value }, campaign.id).catch(() => {})}>
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="paused">Paused</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                  <button className="icon-button danger" aria-label={`Delete ${campaign.name}`} onClick={async () => (await ask({ title: `Delete campaign “${campaign.name}”?`, body: "Its QR codes stay active but are no longer grouped under this campaign.", action: "Delete campaign" })) && mutate("campaign.delete", undefined, campaign.id).catch(() => {})}>
-                    <Trash2 size={16} />
-                  </button>
-                </>
-              ) : (
-                <span className="badge">{campaign.status}</span>
-              )}
-            </div>
-          ))}
-        </div>
-        {!data.campaigns.length && <Empty icon={Megaphone} title="No campaigns yet" text="Create a campaign, then assign QR codes to it from the code editor." />}
       </div>
     </div>
   );

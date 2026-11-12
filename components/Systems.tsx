@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ExternalLink, Eye, EyeOff, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
-import { api, Ctx, Empty, Field, Modal, itemMotion, listMotion, plural } from "./ui";
+import { api, Ctx, Empty, Field, Modal, itemMotion, limitText, listMotion, plural } from "./ui";
 
 type RecordItem = { id: string; title: string; publicToken: string; isPublic: boolean; data: Record<string, string | number | boolean | null> };
 const fieldTypes = [
@@ -101,7 +101,7 @@ export default function Systems({ ctx }: { ctx: Ctx }) {
           <div>
             <h2>Your systems</h2>
             <p className="muted">
-              A system is a custom table, such as products, assets or members. {data.systems.length} of {data.limits.systems} used.
+              A system is a custom table, such as products, assets or members. {data.usage.systems} of {limitText(data.limits.systems)} used.
             </p>
           </div>
           {canWrite && !creating && (

@@ -43,17 +43,15 @@ export async function POST(
       return json({ received: true });
     }
     const user = await authorize(true);
-    if (user.role !== "owner")
-      throw new ApiError(403, "Only the workspace owner can manage billing.");
+    if (user.role !== "owner" || user.workspace.parentId || user.workspaceId !== user.homeWorkspaceId)
+      throw new ApiError(403, "Only the account owner can manage billing, from the main panel.");
     const input = await body(request);
     await rateLimit(`billing:${user.id}`, 10, 60);
     if (action === "order") {
-      const { plan } = z
-        .object({ plan: z.enum(["pro", "business"]) })
-        .parse(input);
-      const amount = Number(
-        process.env[plan === "pro" ? "PLAN_PRO_PAISE" : "PLAN_BUSINESS_PAISE"],
-      );
+      const { plan } = z.object({ plan: z.string().max(40) }).parse(input);
+      const row = await prisma.plan.findFirst({ where: { id: plan, isPublic: true } });
+      if (!row || row.id === "free") throw new ApiError(404, "Plan not found.");
+      const amount = row.pricePaise;
       if (
         !Number.isSafeInteger(amount) ||
         amount < 100 ||

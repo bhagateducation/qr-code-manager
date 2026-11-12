@@ -36,11 +36,24 @@ Paid plans last 30 days and do not renew automatically. When a plan ends, limits
 - **API keys** (owner or admin): send the key in an `x-api-key` header to `GET /api/v1/qr` and `POST /api/v1/qr`. The key is shown once.
 - **Webhooks** (owner or admin): add a public HTTPS endpoint to receive a `scan.created` event on every scan. Verify it by computing HMAC-SHA256 of the raw body with your signing secret and comparing with the `X-QR-Manager-Signature` header.
 
+## Copying and printing
+
+- **Copy QR image** puts the picture on the clipboard, ready to paste into WhatsApp, Word or a design tool. The download icon saves a PNG.
+- **Name and number on images** (a tick box in the list and the editor) adds the code's name and number under the QR on copies, downloads and print sheets. Off gives the plain QR. The choice is remembered on that device.
+- **Import CSV** creates many codes at once from a file with the columns title, url and folder.
+- Changing a website code's link never changes its image. This is tested automatically.
+
+## Panels and custom domains
+
+- **Panels** are separate workspaces inside one account, for example one per branch. The account owner creates them under Panels and switches between them from the box at the top of the menu. Each panel has its own codes, folders and members; the plan's limits are shared.
+- **Custom domain** (Settings, on plans that include it): add the CNAME and TXT records shown, then press Check now. Codes use the domain only while it is verified and working; if it fails, new copies and downloads switch back to the main domain automatically and a warning appears. Codes already printed with the custom domain need its DNS to stay pointed at us.
+
 ## For the platform owner
 
-Sign in at the same `/dashboard`. The **Clients** entry appears only for the platform owner account created by `scripts/bootstrap.mjs`.
+Sign in at the same `/dashboard`. There is exactly one platform owner, and its workspace has no limits. The Platform part of the menu appears only for that account.
 
-- Search clients by workspace name or owner email.
-- **Set plan** grants Free, Pro or Business for a number of days. Use it when a client pays you directly.
-- **Suspend** signs out the client's members and stops all of that workspace's codes from redirecting. **Restore** reverses it.
+- **Clients**: revenue, paying, expiring and expired counts; every client with plan, end date, codes used, storage and last activity. Open one to set or extend their plan, record a cash, UPI or bank payment, give them custom limits or storage (or unlimited), switch features on or off, keep private notes, open their panel to help them, or suspend them (their panels stop too).
+- **Send reminders now** emails clients whose plan ends within 7 days (needs email sending set up). It also runs on its own every 6 hours.
+- **Plans**: create and edit plans: price, length in days, limits (or unlimited), storage, panels, team size, features, and whether the plan shows on the website.
+- **Website**: edit the home page headline, text, use cases, questions and which sections show. Saving publishes it within a minute.
 - Each action is written to your audit log.

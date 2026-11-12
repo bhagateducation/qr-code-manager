@@ -1,9 +1,10 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Building2, Check, LifeBuoy, Mail, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { Activity, Check, LifeBuoy, Mail, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { BRAND, SUPPORT_EMAIL } from "@/lib/brand";
-import { api, Ctx, Empty, Modal, Secret, formatDate, formatDateTime, itemMotion, listMotion, rupees } from "./ui";
+import { api, Ctx, Drive, Empty, Info, Secret, formatDate, formatDateTime, itemMotion, limitText, listMotion, rupees } from "./ui";
+import { DomainSettings } from "./Account";
 import { Meter } from "./Overview";
 
 const roleHelp: Record<string, string> = {
@@ -119,8 +120,6 @@ export function Team({ ctx }: { ctx: Ctx }) {
   );
 }
 
-const planNotes: Record<string, string> = { free: "For your first codes", pro: "For growing teams and campaigns", business: "For large collections and operations" };
-const planLimits = { free: [10, 1, 50], pro: [500, 10, 5000], business: [2500, 50, 25000] } as const;
 export function Billing({ ctx }: { ctx: Ctx }) {
   const { data, isOwner, reload, notify } = ctx;
   const [busy, setBusy] = useState(false);
@@ -142,7 +141,7 @@ export function Billing({ ctx }: { ctx: Ctx }) {
         amount: order.amount,
         currency: order.currency,
         name: BRAND,
-        description: `${plan} plan — 30 days`,
+        description: `${data.plans.find((item) => item.id === plan)?.name || plan} plan`,
         theme: { color: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() },
         handler: async (response: unknown) => {
           try {
@@ -167,52 +166,53 @@ export function Billing({ ctx }: { ctx: Ctx }) {
       setBusy(false);
     }
   }
-  const plans = [
-    { id: "free", price: 0 },
-    { id: "pro", price: data.prices.pro },
-    { id: "business", price: data.prices.business },
-  ] as const;
+  const { workspace, limits, usage } = data;
+  // A panel shares its main account's plan; buying happens on the main panel.
+  if (workspace.isPanel || data.account.visiting)
+    return <p className="notice info">This panel uses the plan of {workspace.accountName}. Plans and payments are managed by its owner from the main panel.</p>;
+  if (workspace.plan === "owner")
+    return <p className="notice info">This is the platform owner's workspace. It has every feature and no limits, so there is nothing to buy.</p>;
   return (
     <div className="page-stack">
       <div className="panel stack">
         <div className="panel-heading" style={{ marginBottom: 0 }}>
           <div>
-            <h2 style={{ textTransform: "capitalize" }}>{data.workspace.plan} plan</h2>
-            <p className="muted">{data.workspace.paidUntil && data.workspace.plan !== "free" ? `Active until ${formatDate(data.workspace.paidUntil)}. It does not renew automatically.` : "No payment needed."}</p>
+            <h2>{workspace.planName} plan</h2>
+            <p className="muted">{workspace.paidUntil && workspace.plan !== "free" ? `Active until ${formatDate(workspace.paidUntil)}. It does not renew automatically — renew before it ends.` : workspace.lapsedPlan ? "Your paid plan has ended, so the Free limits apply. Your codes still work." : "No payment needed."}</p>
           </div>
         </div>
         <div className="three-col">
-          <Meter label="QR codes" used={data.codeCount} limit={data.limits.codes} />
-          <Meter label="Systems" used={data.systems.length} limit={data.limits.systems} />
-          <Meter label="Records" used={data.recordCount} limit={data.limits.records} />
+          <Meter label="QR codes" used={usage.codes} limit={limits.codes} />
+          <Meter label="Team members" used={usage.members} limit={limits.members} />
+          <Meter label="Extra panels" used={usage.panels} limit={limits.panels} />
         </div>
+        <Drive used={usage.storageBytes} limitMb={limits.storageMb} />
       </div>
       {!data.checkoutReady && <p className="notice info">Online payment is not switched on for this site yet. {SUPPORT_EMAIL ? `Contact ${SUPPORT_EMAIL} to upgrade.` : "Contact your provider to upgrade."}</p>}
       <motion.div className="plans-grid" variants={listMotion} initial="hidden" animate="show">
-        {plans.map((plan) => {
-          const [codes, systems, records] = planLimits[plan.id];
-          const isCurrent = plan.id === data.workspace.plan;
+        {data.plans.map((plan) => {
+          const isCurrent = plan.id === workspace.plan;
           return (
             <motion.div variants={itemMotion} className={`panel plan ${isCurrent ? "current" : ""}`} key={plan.id}>
               <div className="row-actions" style={{ justifyContent: "space-between" }}>
-                <h2 style={{ textTransform: "capitalize" }}>{plan.id}</h2>
+                <h2>{plan.name}</h2>
                 {isCurrent && <span className="badge">Current</span>}
               </div>
               <p className="price">
-                {plan.price ? rupees(plan.price) : plan.id === "free" ? "₹0" : "—"}
-                <small className="muted"> /{plan.id === "free" ? "forever" : "30 days"}</small>
+                {rupees(plan.pricePaise)}
+                <small className="muted"> /{plan.id === "free" ? "forever" : `${plan.days} days`}</small>
               </p>
-              <p className="muted">{planNotes[plan.id]}</p>
+              {plan.description && <p className="muted">{plan.description}</p>}
               <ul>
-                {[`${codes.toLocaleString()} QR codes`, `${systems} business ${systems === 1 ? "system" : "systems"}`, `${records.toLocaleString()} records`, "Analytics, API and webhooks"].map((line) => (
+                {[`${limitText(plan.codes)} QR codes`, `${limitText(plan.storageMb === null ? null : plan.storageMb >= 1024 ? plan.storageMb / 1024 : plan.storageMb)} ${plan.storageMb !== null && plan.storageMb < 1024 ? "MB" : "GB"} storage`, `${limitText(plan.members)} team members`, `${limitText(plan.panels)} extra panels`, ...(plan.allowBooks ? ["Book QR"] : []), ...(plan.allowApi ? ["API and webhooks"] : []), ...(plan.allowDomain ? ["Your own domain"] : [])].map((line) => (
                   <li key={line}>
                     <Check size={16} /> {line}
                   </li>
                 ))}
               </ul>
               {plan.id !== "free" && (
-                <button className={`button ${isCurrent ? "" : "primary"}`} disabled={busy || !data.checkoutReady || !plan.price || !isOwner || (data.workspace.plan === "business" && plan.id === "pro")} onClick={() => checkout(plan.id)}>
-                  {!isOwner ? "Owner only" : isCurrent ? "Extend 30 days" : "Upgrade"}
+                <button className={`button ${isCurrent ? "" : "primary"}`} disabled={busy || !data.checkoutReady || plan.pricePaise < 100 || !isOwner} onClick={() => checkout(plan.id)}>
+                  {!isOwner ? "Owner only" : isCurrent ? `Extend ${plan.days} days` : "Choose plan"}
                 </button>
               )}
             </motion.div>
@@ -226,7 +226,7 @@ export function Billing({ ctx }: { ctx: Ctx }) {
         {data.payments.map((payment) => (
           <div className="audit-row" key={payment.id}>
             <span>
-              <strong style={{ textTransform: "capitalize" }}>{payment.plan}</strong> {rupees(payment.amount)}
+              <strong>{data.plans.find((plan) => plan.id === payment.plan)?.name || payment.plan}</strong> {rupees(payment.amount)}
             </span>
             <span className={`badge ${payment.status === "paid" || payment.status === "captured" ? "success" : "neutral"}`}>{payment.status}</span>
             <time>{formatDate(payment.createdAt)}</time>
@@ -250,6 +250,19 @@ const actionLabels: Record<string, string> = {
   "qr.bulk.restore": "Restored QR codes from the trash",
   "qr.bulk.purge": "Permanently deleted QR codes",
   "trash.empty": "Emptied the trash",
+  "qr.duplicate": "Duplicated a QR code",
+  "qr.import": "Imported QR codes from a CSV",
+  "panel.create": "Created a panel",
+  "panel.rename": "Renamed a panel",
+  "panel.delete": "Deleted a panel",
+  "panel.enter": "Opened this panel",
+  "platform.enter": "The platform owner opened this workspace",
+  "domain.save": "Set a custom domain",
+  "domain.check": "Checked the custom domain",
+  "domain.use": "Changed which domain QR codes use",
+  "domain.remove": "Removed the custom domain",
+  "subscription.reminder": "Sent a plan renewal reminder",
+  "payment.captured": "Received an online payment",
   "qr.bulk.move": "Moved QR codes to a folder",
   "folder.create": "Created a folder",
   "folder.rename": "Renamed a folder",
@@ -457,6 +470,7 @@ export function SettingsPanel({ ctx }: { ctx: Ctx }) {
           </button>
         </form>
         <Mfa ctx={ctx} />
+        <DomainSettings ctx={ctx} />
         <div className="panel stack">
           <div>
             <h2>Signed-in devices</h2>
@@ -480,6 +494,10 @@ export function SettingsPanel({ ctx }: { ctx: Ctx }) {
 }
 
 const faq = [
+  ["Does changing a link change the QR code?", "No. A website-link code holds a short permanent link. Changing where it leads, its folder, name or tags never changes the image, so printed codes keep working. Only changing the code's type (for example to Wi-Fi) makes a new image."],
+  ["How do folders and Book QR work?", "Folders are categories and can sit inside each other, like Book, then Chapter. Book QR makes a book folder, a folder per chapter and one code per question in one go. Open a folder and use Print sheet to print all of its codes."],
+  ["What are panels?", "Separate workspaces inside your account, for example one per branch or department. Each has its own codes, folders and members. Your plan's limits are shared across all of them. The account owner creates them under Panels."],
+  ["How is storage counted?", "Storage is estimated from what you keep: codes, records, folders and scan history. The Plan & billing page shows how much is used and free."],
   ["What is a dynamic QR code?", "The printed code holds a short permanent link. When someone scans it we forward them to your destination, which you can change at any time without reprinting."],
   ["Which QR types need a reprint after editing?", "Wi-Fi, contact card and plain text codes store their content inside the code itself, so the image changes when you edit them. Website link codes never change."],
   ["How do I send iPhone and Android users to different places?", "Open a website link code, expand “Device routing and expiry”, and add a separate address for each. Everyone else goes to the main destination."],
@@ -535,169 +553,3 @@ export function Help({ ctx }: { ctx: Ctx }) {
   );
 }
 
-type Client = { id: string; name: string; plan: string; paidUntil: string | null; suspended: boolean; createdAt: string; ownerEmail: string; _count: { users: number; qrCodes: number } };
-/** Platform owner only: every customer workspace, with manual plan grants and suspension. */
-export function Clients({ ctx }: { ctx: Ctx }) {
-  const { notify, ask } = ctx;
-  const [report, setReport] = useState<{ totals: Record<string, number>; workspaces: Client[] } | null>(null),
-    [search, setSearch] = useState(""),
-    [granting, setGranting] = useState<Client | null>(null),
-    [busy, setBusy] = useState(false);
-  const load = useCallback(
-    () =>
-      api(`/api/platform?search=${encodeURIComponent(search)}`)
-        .then(setReport)
-        .catch((e) => notify(e.message, "error")),
-    [search, notify],
-  );
-  useEffect(() => {
-    const timer = setTimeout(load, 250);
-    return () => clearTimeout(timer);
-  }, [load]);
-  async function post(payload: object, done: string) {
-    setBusy(true);
-    try {
-      await api("/api/platform", payload);
-      await load();
-      notify(done);
-      setGranting(null);
-    } catch (e) {
-      notify((e as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="page-stack">
-      {report && (
-        <div className="stats-grid">
-          {[
-            ["Client workspaces", report.totals.workspaces],
-            ["Users", report.totals.users],
-            ["QR codes", report.totals.codes],
-            ["Suspended", report.totals.suspended],
-          ].map(([label, value]) => (
-            <div className="stat" key={label}>
-              <span className="stat-label">{label}</span>
-              <strong>{Number(value).toLocaleString()}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="panel flush">
-        <div className="toolbar">
-          <div className="search">
-            <Search size={16} />
-            <input type="search" aria-label="Search clients" placeholder="Search by workspace or owner email…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-        </div>
-        {!report ? (
-          <div className="skeleton" style={{ height: 200, margin: 20 }} />
-        ) : report.workspaces.length ? (
-          <div className="table-scroll">
-            <table className="cards">
-              <thead>
-                <tr>
-                  <th>Workspace</th>
-                  <th>Plan</th>
-                  <th>Users</th>
-                  <th>Codes</th>
-                  <th>Joined</th>
-                  <th>
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.workspaces.map((client) => (
-                  <tr key={client.id}>
-                    <td>
-                      <div className="row-title">
-                        <span className="qr-tile">
-                          <Building2 size={17} />
-                        </span>
-                        <span className="grow">
-                          {client.name} {client.suspended && <span className="badge error">Suspended</span>}
-                          <small>{client.ownerEmail}</small>
-                        </span>
-                      </div>
-                    </td>
-                    <td data-label="Plan">
-                      <span>
-                        <span className="badge">{client.plan}</span>
-                        {client.plan !== "free" && client.paidUntil && <small> until {formatDate(client.paidUntil)}</small>}
-                      </span>
-                    </td>
-                    <td data-label="Users">{client._count.users}</td>
-                    <td data-label="Codes">{client._count.qrCodes}</td>
-                    <td data-label="Joined">{formatDate(client.createdAt)}</td>
-                    <td className="actions">
-                      <div className="row-actions" style={{ justifyContent: "flex-end", flexWrap: "nowrap" }}>
-                        <button className="button small" onClick={() => setGranting(client)}>
-                          Set plan
-                        </button>
-                        <button
-                          className={`button small ${client.suspended ? "" : "danger"}`}
-                          disabled={busy}
-                          onClick={async () =>
-                            (await ask({
-                              title: `${client.suspended ? "Restore" : "Suspend"} ${client.name}?`,
-                              body: client.suspended ? "Members can sign in again and the workspace's QR codes start working." : "Members are signed out and every QR code of this workspace stops redirecting until you restore it.",
-                              action: client.suspended ? "Restore" : "Suspend",
-                              danger: !client.suspended,
-                            })) && post({ id: client.id, suspended: !client.suspended }, client.suspended ? "Workspace restored." : "Workspace suspended.")
-                          }
-                        >
-                          {client.suspended ? "Restore" : "Suspend"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty icon={Building2} title="No workspaces found" text="Try a different search." />
-        )}
-      </div>
-      <AnimatePresence>
-        {granting && (
-          <Modal title={`Set plan for ${granting.name}`} onClose={() => setGranting(null)}>
-            <form
-              className="stack"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const form = new FormData(event.currentTarget);
-                void post({ id: granting.id, plan: form.get("plan"), days: Number(form.get("days")) }, "Plan updated.");
-              }}
-            >
-              <p className="muted">Use this when a client pays you directly. It takes effect immediately and is recorded in your audit log.</p>
-              <label>
-                Plan
-                <select name="plan" defaultValue={granting.plan}>
-                  <option value="free">Free</option>
-                  <option value="pro">Pro</option>
-                  <option value="business">Business</option>
-                </select>
-              </label>
-              <label>
-                Valid for (days from today)
-                <input name="days" type="number" min={1} max={3660} defaultValue={30} required />
-                <small>Ignored for the Free plan.</small>
-              </label>
-              <div className="modal-actions">
-                <button type="button" className="button" onClick={() => setGranting(null)}>
-                  Cancel
-                </button>
-                <button className="button primary" disabled={busy}>
-                  Save plan
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}

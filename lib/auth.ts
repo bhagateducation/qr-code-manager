@@ -40,8 +40,18 @@ export async function getSessionUser() {
     session.user.workspace.suspended
   )
     return null;
-  return session.user;
+  const user = { ...session.user, homeWorkspaceId: session.user.workspaceId, homeWorkspaceName: session.user.workspace.name };
+  if (session.workspaceId && session.workspaceId !== user.workspaceId) {
+    const panel = await prisma.workspace.findUnique({ where: { id: session.workspaceId } });
+    if (panel && !panel.suspended && canEnter(user, panel))
+      // The platform owner works in a client's panel with full rights; an account owner keeps their own role.
+      return { ...user, workspaceId: panel.id, workspace: panel, role: user.platformAdmin && panel.parentId !== user.workspaceId ? "owner" : user.role };
+  }
+  return user;
 }
+/** Who may open a panel other than their own: the platform owner anywhere, an account's owner or admin in its panels. */
+export const canEnter = (user: { platformAdmin: boolean; workspaceId: string; role: string }, panel: { id: string; parentId: string | null }) =>
+  user.platformAdmin || (panel.parentId === user.workspaceId && ["owner", "admin"].includes(user.role));
 /** Ends every session of this user except the one making the request. */
 export async function revokeOtherSessions(userId: string) {
   const token = (await cookies()).get(COOKIE_NAME)?.value;

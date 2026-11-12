@@ -1,27 +1,22 @@
 import Link from "next/link";
 import { ArrowRight, Check, Download, PencilLine, QrCode, ScanLine, Search, ShieldCheck, Smartphone, Trash2, Users } from "lucide-react";
 import { BRAND } from "@/lib/brand";
-import { limits } from "@/lib/validation";
+import { getPublicPlans, getSite } from "@/lib/site";
 import Reveal from "@/components/Reveal";
 import { LiveDemo, ScrollBar, SiteMotion, SwapDemo, Tile } from "@/components/SiteDemo";
 import { ThemeControl } from "@/components/ui";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
 const week = [38, 52, 44, 71, 63, 88, 100];
-const faq = [
-  ["What is a dynamic QR code?", "The printed code holds a short permanent link. When someone scans it, they are forwarded to your destination, and you can change that destination whenever you like. Nothing needs reprinting."],
-  ["Can I manage thousands of codes?", "Yes. Every code gets its own number, such as QR-00042. Search by number, name or link, filter by status, type, campaign or tag, and pause or trash many codes at once."],
-  ["What if I delete a code by mistake?", "Deleted codes go to the trash and can be restored for 30 days. Only an owner or admin can delete them for good."],
-  ["Do paid plans renew automatically?", "No. A paid plan lasts 30 days. When it ends your limits return to Free; nothing is deleted and your existing codes keep working."],
-  ["Is there an API?", "Yes. Create and list codes with an API key, and receive a signed webhook the moment a code is scanned."],
-];
+// The page is rebuilt at most once a minute, and straight away when the owner saves it in the panel.
+export const revalidate = 60;
+const limitLine = (value: number | null, word: string) => `${value === null ? "Unlimited" : value.toLocaleString()} ${word}`;
 
-export default function Home() {
-  const plans = [
-    { id: "free", name: "Free", price: 0, note: "For your first codes" },
-    { id: "pro", name: "Pro", price: Number(process.env.PLAN_PRO_PAISE || 0) / 100, note: "For growing teams and campaigns" },
-    { id: "business", name: "Business", price: Number(process.env.PLAN_BUSINESS_PAISE || 0) / 100, note: "For large collections and operations" },
-  ];
+export default async function Home() {
+  const [site, plans] = await Promise.all([getSite(), getPublicPlans()]);
+  const free = plans.find((plan) => plan.id === "free");
+  // The plan in the middle is highlighted, as the usual pick.
+  const featured = plans.length > 2 ? plans[Math.floor(plans.length / 2)].id : plans.at(-1)?.id;
   return (
     <SiteMotion>
     <div className="site">
@@ -35,10 +30,10 @@ export default function Home() {
             {BRAND}
           </Link>
           <nav aria-label="Main">
-            <a href="#features">Features</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
+            {site.show.features && <a href="#features">Features</a>}
+            {site.show.steps && <a href="#how-it-works">How it works</a>}
+            {site.show.pricing && <a href="#pricing">Pricing</a>}
+            {site.show.faq && <a href="#faq">FAQ</a>}
           </nav>
           <div className="row-actions" style={{ flexWrap: "nowrap" }}>
             <ThemeControl />
@@ -56,14 +51,14 @@ export default function Home() {
         <section className="hero">
           <Reveal className="hero-copy">
             <h1 className="display">
-              Print once.
+              {site.heroLine1}
               <br />
-              <span>Update forever.</span>
+              <span>{site.heroLine2}</span>
             </h1>
-            <p>QR codes whose destination you can change after they are printed. Number them, find any one in seconds, and watch every scan arrive.</p>
+            <p>{site.heroText}</p>
             <div className="row-actions">
               <Link href="/register" className="button primary large">
-                Start free <ArrowRight size={17} />
+                {site.ctaLabel} <ArrowRight size={17} />
               </Link>
               <a href="#features" className="button large">
                 See what it does
@@ -71,7 +66,7 @@ export default function Home() {
             </div>
             <div className="hero-notes">
               <span>
-                <Check size={15} /> {limits.free.codes} codes free, forever
+                <Check size={15} /> {free ? `${limitLine(free.codes, "codes")} free, forever` : "Free plan available"}
               </span>
               <span>
                 <Check size={15} /> No card needed
@@ -84,11 +79,12 @@ export default function Home() {
         </section>
 
         <div className="marquee">
-          {["Restaurant menus", "Product packaging", "Business cards", "Asset labels", "Event tickets", "Guest Wi-Fi"].map((item) => (
+          {site.useCases.map((item) => (
             <span key={item}>{item}</span>
           ))}
         </div>
 
+        {site.show.features && (
         <section id="features" className="site-section">
           <Reveal className="section-intro">
             <h2 className="display">Everything a code needs after it is printed</h2>
@@ -182,7 +178,9 @@ export default function Home() {
             </Tile>
           </div>
         </section>
+        )}
 
+        {site.show.steps && (
         <section id="how-it-works" className="site-section">
           <Reveal className="section-intro">
             <h2 className="display">Working code in three steps</h2>
@@ -203,7 +201,9 @@ export default function Home() {
             ))}
           </ol>
         </section>
+        )}
 
+        {site.show.safety && (
         <section className="site-section">
           <Reveal className="section-intro">
             <h2 className="display">Safe by default</h2>
@@ -229,28 +229,29 @@ export default function Home() {
             ))}
           </div>
         </section>
+        )}
 
+        {site.show.pricing && plans.length > 0 && (
         <section id="pricing" className="site-section">
           <Reveal className="section-intro">
             <h2 className="display">Simple plans that grow with you</h2>
-            <p>Start free. Paid plans last 30 days and never renew on their own.</p>
+            <p>Start free. Paid plans run for their period and never renew on their own.</p>
           </Reveal>
           <div className="plans-grid">
             {plans.map((plan, index) => {
-              const limit = limits[plan.id];
               return (
-                <Tile className={`panel plan ${plan.id === "pro" ? "featured" : ""}`} key={plan.id} delay={index * 0.08}>
+                <Tile className={`panel plan ${plan.id === featured ? "featured" : ""}`} key={plan.id} delay={index * 0.08}>
                   <div className="row-actions" style={{ justifyContent: "space-between" }}>
                     <h3>{plan.name}</h3>
-                    {plan.id === "pro" && <span className="badge">Most popular</span>}
+                    {plan.id === featured && <span className="badge">Most popular</span>}
                   </div>
                   <p className="price">
-                    {plan.id === "free" || plan.price ? `₹${plan.price.toLocaleString("en-IN")}` : "Contact us"}
-                    {(plan.id === "free" || plan.price > 0) && <small className="muted"> /{plan.price ? "30 days" : "forever"}</small>}
+                    ₹{(plan.pricePaise / 100).toLocaleString("en-IN")}
+                    <small className="muted"> /{plan.pricePaise ? `${plan.days} days` : "forever"}</small>
                   </p>
-                  <p className="muted">{plan.note}</p>
+                  {plan.description && <p className="muted">{plan.description}</p>}
                   <ul>
-                    {[`${limit.codes.toLocaleString()} QR codes`, `${limit.systems} business ${limit.systems === 1 ? "system" : "systems"}`, `${limit.records.toLocaleString()} records`, "Analytics, API and webhooks", "Team roles, trash and audit log"].map((line) => (
+                    {[limitLine(plan.codes, "QR codes"), plan.storageMb === null ? "Unlimited storage" : `${plan.storageMb >= 1024 ? `${plan.storageMb / 1024} GB` : `${plan.storageMb} MB`} storage`, limitLine(plan.members, "team members"), limitLine(plan.panels, "extra panels"), ...(plan.allowBooks ? ["Book QR"] : []), ...(plan.allowDomain ? ["Your own domain"] : []), "Folders, trash and audit log"].map((line) => (
                       <li key={line}>
                         <Check size={16} /> {line}
                       </li>
@@ -264,24 +265,27 @@ export default function Home() {
             })}
           </div>
         </section>
+        )}
 
+        {site.show.faq && site.faq.length > 0 && (
         <section id="faq" className="site-section">
           <Reveal className="section-intro">
             <h2 className="display">Questions, answered</h2>
           </Reveal>
           <div className="faq">
-            {faq.map(([question, answer]) => (
-              <details key={question}>
-                <summary>{question}</summary>
-                <p className="details-content">{answer}</p>
+            {site.faq.map((item) => (
+              <details key={item.q}>
+                <summary>{item.q}</summary>
+                <p className="details-content">{item.a}</p>
               </details>
             ))}
           </div>
         </section>
+        )}
 
         <Reveal className="cta">
-          <h2 className="display">Make your first code in a minute</h2>
-          <p>Free to start. Change the destination whenever you need.</p>
+          <h2 className="display">{site.ctaTitle}</h2>
+          <p>{site.ctaText}</p>
           <Link className="button large" href="/register">
             Get started free <ArrowRight size={17} />
           </Link>

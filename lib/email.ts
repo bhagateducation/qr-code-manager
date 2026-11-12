@@ -21,7 +21,7 @@ export async function sendPasswordResetEmail(to: string, link: string) {
   }
 }
 
-async function sendEmail(to: string, subject: string, text: string) {
+export async function sendEmail(to: string, subject: string, text: string) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!key || !from) return false;

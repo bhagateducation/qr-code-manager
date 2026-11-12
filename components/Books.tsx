@@ -2,12 +2,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, FolderOpen, Plus, Printer, Trash2, X } from "lucide-react";
-import { api, Ctx, Empty, plural, qrNumber } from "./ui";
+import { api, Ctx, Empty, Info, plural, qrNumber, useLabelPref } from "./ui";
 
 type SheetCode = { number: number; title: string; payload: string; path?: string; size?: number };
 
 /** Every code of a folder (and its sub-folders) laid out for printing or saving as PDF. */
-export function PrintSheet({ folderId, onClose, notify }: { folderId: string; onClose: () => void; notify: Ctx["notify"] }) {
+export function PrintSheet({ folderId, onClose, notify, label = true }: { folderId: string; onClose: () => void; notify: Ctx["notify"]; label?: boolean }) {
+  const [withLabel, setWithLabel] = useState(label);
   const [sheet, setSheet] = useState<{ title: string; codes: SheetCode[] } | null>(null);
   useEffect(() => {
     let active = true;
@@ -34,6 +35,10 @@ export function PrintSheet({ folderId, onClose, notify }: { folderId: string; on
     <div className="sheet" role="dialog" aria-modal="true" aria-label="Print sheet">
       <div className="sheet-bar">
         <strong className="grow truncate">{sheet ? `${sheet.title} · ${plural(sheet.codes.length, "code")}` : "Preparing the sheet…"}</strong>
+        <label className="toggle-row">
+          <input type="checkbox" checked={withLabel} onChange={(event) => setWithLabel(event.target.checked)} />
+          Show name and number
+        </label>
         <button className="button primary" disabled={!sheet?.codes.length} onClick={() => window.print()}>
           <Printer size={16} /> Print or save as PDF
         </button>
@@ -49,10 +54,12 @@ export function PrintSheet({ folderId, onClose, notify }: { folderId: string; on
               <rect x={-2} y={-2} width={code.size! + 4} height={code.size! + 4} fill="#fff" />
               <path d={code.path} fill="#000" />
             </svg>
-            <figcaption>
-              <b>{code.title}</b>
-              {qrNumber(code.number)}
-            </figcaption>
+            {withLabel && (
+              <figcaption>
+                <b>{code.title}</b>
+                {qrNumber(code.number)}
+              </figcaption>
+            )}
           </figure>
         ))}
       </div>
@@ -70,8 +77,9 @@ export default function Books({ ctx }: { ctx: Ctx }) {
   const [fill, setFill] = useState({ chapters: 10, questions: 20 });
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState("");
+  const [withLabel] = useLabelPref();
   const total = chapters.reduce((sum, chapter) => sum + (chapter.questions || 0), 0);
-  const left = data.limits.codes - data.codeCount;
+  const left = data.limits.codes === null ? Infinity : data.limits.codes - data.usage.codes;
   const books = data.folders.filter((folder) => folder.kind === "book");
   const setChapter = (index: number, patch: Partial<Chapter>) => setChapters(chapters.map((chapter, i) => (i === index ? { ...chapter, ...patch } : chapter)));
 
@@ -105,6 +113,7 @@ export default function Books({ ctx }: { ctx: Ctx }) {
             </label>
             <label>
               Link for each question
+              <Info text="Every question gets its own dynamic QR. Write the link once with {chapter} and {question} in it, e.g. https://your-site.com/maths/{chapter}/{question}; each code fills in its own numbers. You can change any single code's link later." />
               <input name="urlTemplate" required maxLength={1500} defaultValue="https://your-site.com/book/{chapter}/{question}" />
               <small>
                 <code>{"{chapter}"}</code> and <code>{"{question}"}</code> are replaced with their numbers.
@@ -114,6 +123,7 @@ export default function Books({ ctx }: { ctx: Ctx }) {
           <div className="inline-form">
             <label style={{ flex: "0 1 130px" }}>
               Chapters
+              <Info text="Each chapter becomes a sub-folder inside the book's folder, so codes stay sorted chapter by chapter. Set the counts, press Fill the list, then rename chapters or change their question counts one by one." />
               <input type="number" min={1} max={60} value={fill.chapters} onChange={(e) => setFill({ ...fill, chapters: Number(e.target.value) })} />
             </label>
             <label style={{ flex: "0 1 170px" }}>
@@ -142,7 +152,7 @@ export default function Books({ ctx }: { ctx: Ctx }) {
             </button>
             <span className="grow" />
             <small className="num" style={total > left || total > 1000 ? { color: "var(--danger)" } : undefined}>
-              {plural(total, "code")} · {total > 1000 ? "the most in one go is 1,000" : `${Math.max(0, left).toLocaleString()} left on your plan`}
+              {plural(total, "code")} · {total > 1000 ? "the most in one go is 1,000" : `${left === Infinity ? "no plan limit" : `${Math.max(0, left).toLocaleString()} left on your plan`}`}
             </small>
             <button className="button primary" disabled={busy || total > left || total > 1000 || !total}>
               {busy ? "Creating…" : `Create ${plural(total, "code")}`}
@@ -186,7 +196,7 @@ export default function Books({ ctx }: { ctx: Ctx }) {
         </div>
         {!books.length && <Empty icon={BookOpen} title="No books yet" text="Create a book above to get a QR code for every question, sorted by chapter." />}
       </div>
-      {printing && <PrintSheet folderId={printing} onClose={() => setPrinting("")} notify={notify} />}
+      {printing && <PrintSheet folderId={printing} onClose={() => setPrinting("")} notify={notify} label={withLabel} />}
     </div>
   );
 }

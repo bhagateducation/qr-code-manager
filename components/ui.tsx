@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Copy, Moon, Palette, Sun, X, type LucideIcon } from "lucide-react";
+import { Check, Copy, HardDrive, Info as InfoIcon, Moon, Palette, Sun, X, type LucideIcon } from "lucide-react";
 
 export type QR = {
   id: string;
@@ -32,9 +32,18 @@ export function folderTrail(folders: Folder[], id?: string | null) {
 export const folderPath = (folders: Folder[], id?: string | null) => folderTrail(folders, id).map((folder) => folder.name).join(" / ");
 export type Field = { key: string; label: string; type: string; isRequired: boolean };
 export type System = { id: string; name: string; description: string; fields: Field[]; _count: { records: number } };
+/** Plan limits; null means unlimited. */
+export type Limits = { codes: number | null; systems: number | null; records: number | null; storageMb: number | null; panels: number | null; members: number | null; allowApi: boolean; allowBooks: boolean; allowDomain: boolean };
+export type Plan = Omit<Limits, never> & { id: string; name: string; description: string | null; pricePaise: number; days: number; isPublic: boolean; sort: number };
+export type Usage = { codes: number; systems: number; records: number; folders: number; members: number; invites: number; scans: number; panels: number; storageBytes: number };
 export type Data = {
   user: { id: string; name: string; email: string; role: string; platformAdmin: boolean };
-  workspace: { name: string; plan: string; paidUntil: string | null };
+  workspace: { id: string; name: string; plan: string; planName: string; paidUntil: string | null; lapsedPlan: string | null; isPanel: boolean; accountName: string };
+  account: { manages: boolean; panels: { id: string; name: string; createdAt: string; current: boolean; _count: { qrCodes: number; users: number } }[]; rootId: string; homeId: string; homeName: string; visiting: boolean };
+  usage: Usage;
+  plans: Plan[];
+  domain: { name: string | null; status: string; token: string | null; use: boolean; checkedAt: string | null; target: string } | null;
+  linkBase: string;
   qrCodes: QR[];
   systems: System[];
   total: number;
@@ -47,9 +56,8 @@ export type Data = {
   folders: Folder[];
   pageSize: number;
   topCodes: { id: string; title: string; scanCount: number }[];
-  limits: { codes: number; systems: number; records: number };
+  limits: Limits;
   appUrl: string;
-  prices: { pro: number; business: number };
   checkoutReady: boolean;
   logs: { id: string; scannedAt: string; device: string; os: string; browser: string; qrCode: { title: string } }[];
   audit: { id: string; action: string; createdAt: string }[];
@@ -81,6 +89,8 @@ export type Ctx = {
   go: (tab: string) => void;
   /** Opens the QR list showing one folder and everything inside it. */
   openFolder: (id: string) => void;
+  /** Moves this session into one of the account's panels, or back home with null. */
+  switchPanel: (id: string | null) => Promise<void>;
 };
 
 export async function api(path: string, data?: unknown) {
@@ -107,6 +117,9 @@ export const formatDate = (value: string) =>
 export const formatDateTime = (value: string) =>
   new Date(value).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 export const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count === 1 ? "" : "s"}`;
+export const formatBytes = (bytes: number) =>
+  bytes < 1048576 ? `${Math.max(0, Math.round(bytes / 1024))} KB` : bytes < 1073741824 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1073741824).toFixed(2)} GB`;
+export const limitText = (limit: number | null) => (limit === null ? "Unlimited" : limit.toLocaleString());
 export const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
 
 /** Shared motion presets so every list and view moves the same way. */
@@ -246,4 +259,127 @@ export function ThemeControl() {
       </AnimatePresence>
     </div>
   );
+}
+
+/** A small (i) that explains a feature, on hover or tap. Positioned fixed so no panel edge can clip it. */
+export function Info({ text, label = "How this works" }: { text: string; label?: string }) {
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  const show = (target: HTMLElement) => {
+    const box = target.getBoundingClientRect();
+    setAt({ top: box.bottom + 8, left: Math.max(8, Math.min(box.left + box.width / 2 - 150, window.innerWidth - 308)) });
+  };
+  return (
+    <span className="info" onMouseEnter={(event) => show(event.currentTarget)} onMouseLeave={() => setAt(null)}>
+      <button
+        type="button"
+        className="info-dot"
+        aria-label={label}
+        aria-expanded={!!at}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          at ? setAt(null) : show(event.currentTarget);
+        }}
+        onBlur={() => setAt(null)}
+      >
+        <InfoIcon size={13} />
+      </button>
+      <AnimatePresence>
+        {at && (
+          <motion.span role="tooltip" className="info-pop" style={at} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
+            {text}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </span>
+  );
+}
+
+/** A storage drive, drawn like a disk in a file manager. */
+export function Drive({ used, limitMb, label = "Storage" }: { used: number; limitMb: number | null; label?: string }) {
+  const total = limitMb === null ? null : limitMb * 1048576;
+  const share = total ? Math.min(100, (used / total) * 100) : 0;
+  return (
+    <div className="drive">
+      <span className="drive-icon">
+        <HardDrive size={22} />
+      </span>
+      <div className="grow stack" style={{ gap: 6 }}>
+        <div className="meter-row">
+          <strong>{label}</strong>
+          <span className="muted">
+            {formatBytes(used)} of {total === null ? "unlimited" : formatBytes(total)}
+          </span>
+        </div>
+        <div className="meter-track" role="progressbar" aria-label={label} aria-valuenow={Math.round(share)} aria-valuemin={0} aria-valuemax={100}>
+          <motion.div className={`meter-fill ${share >= 90 ? "full" : ""}`} initial={{ width: 0 }} animate={{ width: `${Math.max(share, used ? 1 : 0)}%` }} transition={{ duration: 0.6 }} />
+        </div>
+        <small>{total === null ? "No storage limit" : `${formatBytes(Math.max(0, total - used))} free`}</small>
+      </div>
+    </div>
+  );
+}
+
+export type Label = { title: string; number?: number } | null;
+/** The QR as a PNG, optionally with its name and number printed underneath. */
+export async function qrPng(payload: string, style: { dark?: string; errorCorrectionLevel?: string } = {}, label: Label = null): Promise<Blob> {
+  const { default: QRCode } = await import("qrcode");
+  const code = document.createElement("canvas");
+  await QRCode.toCanvas(code, payload, { width: 1024, margin: 4, errorCorrectionLevel: (style.errorCorrectionLevel as "M") || "M", color: { dark: style.dark || "#17161D", light: "#FFFFFF" } });
+  let out = code;
+  if (label) {
+    await document.fonts?.load("600 52px Poppins").catch(() => {});
+    out = document.createElement("canvas");
+    out.width = code.width;
+    out.height = code.height + (label.number ? 150 : 96);
+    const pen = out.getContext("2d")!;
+    pen.fillStyle = "#fff";
+    pen.fillRect(0, 0, out.width, out.height);
+    pen.drawImage(code, 0, 0);
+    pen.textAlign = "center";
+    pen.textBaseline = "top";
+    pen.fillStyle = "#15161a";
+    pen.font = "600 52px Poppins, sans-serif";
+    let title = label.title;
+    while (title.length > 1 && pen.measureText(title).width > out.width - 96) title = title.slice(0, -2) + "…";
+    pen.fillText(title, out.width / 2, code.height - 24);
+    if (label.number) {
+      pen.fillStyle = "#555863";
+      pen.font = "500 40px Poppins, sans-serif";
+      pen.fillText(qrNumber(label.number), out.width / 2, code.height + 50);
+    }
+  }
+  return new Promise((resolve, reject) => out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("The image could not be created."))), "image/png"));
+}
+/** Puts a PNG on the clipboard so it can be pasted into chats, documents or design tools. */
+export async function copyImage(blob: Promise<Blob>) {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) throw new Error("This browser cannot copy images. Use Download instead.");
+  // Passing the promise keeps Safari's user-gesture check happy while the image renders.
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+/** Whether copies, downloads and prints include the name and number. Off by default, remembered per browser. */
+export function useLabelPref(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    try {
+      setOn(localStorage.getItem("qrm-label") === "on");
+    } catch {}
+  }, []);
+  return [
+    on,
+    (value: boolean) => {
+      setOn(value);
+      try {
+        localStorage.setItem("qrm-label", value ? "on" : "off");
+      } catch {}
+    },
+  ];
 }

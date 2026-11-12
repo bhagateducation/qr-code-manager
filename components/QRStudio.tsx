@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, Contact, Download, FolderPlus, Link2, QrCode, Trash2, Type, Wifi } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardCopy, Contact, Download, Link2, QrCode, Trash2, Type, Wifi } from "lucide-react";
+import FolderPicker from "./FolderPicker";
 import { buildVCardPayload, buildWifiPayload, QRType } from "@/lib/qr-payload";
-import { CopyButton, Ctx, QR, folderPath, qrNumber, saveFile } from "./ui";
+import { CopyButton, Ctx, Info, QR, copyImage, downloadBlob, qrNumber, qrPng, saveFile, useLabelPref } from "./ui";
 
 type Styling = { dark: string; light: string; errorCorrectionLevel: "L" | "M" | "Q" | "H" };
 const types: { id: QRType; label: string; icon: typeof Link2 }[] = [
@@ -39,7 +40,7 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
     [android, setAndroid] = useState(qr?.routingRules?.android || ""),
     [campaignId, setCampaignId] = useState(qr?.campaignId || ""),
     [folderId, setFolderId] = useState(qr ? qr.folderId || "" : defaultFolder),
-    [naming, setNaming] = useState<string | null>(null),
+    [withLabel, setWithLabel] = useLabelPref(),
     [tagIds, setTagIds] = useState<string[]>(qr?.tags?.map((item) => item.tag.id) || []),
     [expiry, setExpiry] = useState(toLocalInput(qr?.routingRules?.expiresAt)),
     [style, setStyle] = useState<Styling>((qr?.styling as Styling) || { dark: "#17161D", light: "#FFFFFF", errorCorrectionLevel: "M" }),
@@ -50,7 +51,7 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
   const keepsSavedPayload = saved?.type === qrType && qrType !== "dynamic_url" && qrType !== "text";
   const staticPayload =
     qrType === "wifi" ? (wifi.ssid.trim() ? buildWifiPayload(wifi) : "") : qrType === "vcard" ? (card.name.trim() ? buildVCardPayload(card) : "") : qrType === "text" ? target : "";
-  const payload = qrType === "dynamic_url" ? (saved?.type === "dynamic_url" || (saved && !saved.type) ? `${data.appUrl}/s/${saved.shortCode}` : "") : staticPayload || (keepsSavedPayload ? saved!.targetUrl : "");
+  const payload = qrType === "dynamic_url" ? (saved?.type === "dynamic_url" || (saved && !saved.type) ? `${data.linkBase}/s/${saved.shortCode}` : "") : staticPayload || (keepsSavedPayload ? saved!.targetUrl : "");
 
   useEffect(() => {
     let active = true;
@@ -110,10 +111,11 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
   async function download(format: "png" | "svg") {
     const filename = (title || "qr-code").replace(/[^a-z0-9_-]/gi, "-").slice(0, 80);
     if (format === "png") {
-      const link = document.createElement("a");
-      link.href = image;
-      link.download = `${filename}.png`;
-      link.click();
+      try {
+        downloadBlob(await qrPng(payload, style, label), `${filename}.png`);
+      } catch (e) {
+        notify((e as Error).message, "error");
+      }
       return;
     }
     try {
@@ -122,14 +124,14 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
       notify("The SVG could not be generated.", "error");
     }
   }
-  // Make a category without leaving the form; it is created inside the folder currently chosen.
-  async function addFolder() {
-    if (!naming?.trim()) return;
+  const label = withLabel ? { title: title || "Untitled code", number: saved?.number } : null;
+  async function copy() {
     try {
-      const result = await mutate("folder.create", { name: naming.trim(), parentId: folderId || null });
-      setFolderId(result.entity.id);
-      setNaming(null);
-    } catch {}
+      await copyImage(qrPng(payload, style, label));
+      notify("QR image copied. Paste it anywhere.");
+    } catch (e) {
+      notify((e as Error).message, "error");
+    }
   }
   async function remove() {
     if (saved && (await ask({ title: `Move “${saved.title}” to the trash?`, body: "It stops working when scanned. You can restore it from the trash for 30 days.", action: "Move to trash" })))
@@ -155,6 +157,10 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
             )}
           </div>
           <fieldset disabled={!canWrite} className="stack" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+            <span className="field-label">
+              QR type
+              <Info text="Website link codes are dynamic: the printed code holds a short link that never changes, and you can point it somewhere else at any time. Contact, Wi-Fi and text codes store their content inside the image, so editing them changes the printed code." />
+            </span>
             <div className="type-grid" role="group" aria-label="QR type">
               {types.map((item) => (
                 <button type="button" key={item.id} className="type-option" aria-pressed={qrType === item.id} onClick={() => setQrType(item.id)}>
@@ -170,6 +176,7 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
             {qrType === "dynamic_url" && (
               <label>
                 Destination URL
+                <Info text="Where people land after scanning. Change it whenever you like — the QR image stays exactly the same, so printed copies keep working." />
                 <input type="url" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="https://your-website.com/menu" required maxLength={2048} />
               </label>
             )}
@@ -226,6 +233,7 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
                 </label>
               </>
             )}
+            {saved && (saved.type || "dynamic_url") !== qrType && <p className="notice error">Changing the type makes a different QR image. Reprint it after saving.</p>}
             {keepsSavedPayload && !staticPayload && <p className="notice info">The saved details stay as they are. Fill the fields above only if you want to replace them.</p>}
             {qrType === "text" && (
               <label>
@@ -244,6 +252,7 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
               </div>
               <label>
                 Error correction
+                <Info text="How much of the code can be scratched or covered and still scan. Medium suits most prints; choose High for outdoor or rough surfaces. Higher levels make the pattern denser." />
                 <select value={style.errorCorrectionLevel} onChange={(e) => setStyle({ ...style, errorCorrectionLevel: e.target.value as Styling["errorCorrectionLevel"] })}>
                   <option value="L">Low — smallest code</option>
                   <option value="M">Medium — recommended</option>
@@ -253,43 +262,20 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
               </label>
             </div>
             <div>
-              <span className="field-label">Folder</span>
-              <div className="row-actions" style={{ marginTop: 6, flexWrap: "nowrap" }}>
-                <select aria-label="Folder" value={folderId} onChange={(e) => setFolderId(e.target.value)}>
-                  <option value="">No folder</option>
-                  {data.folders.map((folder) => (
-                    <option key={folder.id} value={folder.id}>
-                      {folderPath(data.folders, folder.id)}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className="button" onClick={() => setNaming(naming === null ? "" : null)}>
-                  <FolderPlus size={15} /> New
-                </button>
+              <span className="field-label">
+                Folder
+                <Info text="Folders are your categories, for example Book → Chapter. Pick one from the tree, or type a name at the bottom to make a new folder — or a sub-folder inside the one you picked." />
+              </span>
+              <div style={{ marginTop: 6 }}>
+                <FolderPicker ctx={ctx} value={folderId} onChange={setFolderId} />
               </div>
-              {naming !== null && (
-                <div className="row-actions" style={{ marginTop: 8, flexWrap: "nowrap" }}>
-                  <input autoFocus aria-label="New folder name" value={naming} maxLength={100} placeholder={folderId ? `New folder inside ${data.folders.find((folder) => folder.id === folderId)?.name}` : "New folder name"} onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addFolder())} />
-                  <button type="button" className="button primary" onClick={addFolder}>
-                    Add
-                  </button>
-                </div>
-              )}
             </div>
-            <label>
-              Campaign
-              <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
-                <option value="">No campaign</option>
-                {data.campaigns.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id}>
-                    {campaign.name}
-                  </option>
-                ))}
-              </select>
-            </label>
             {data.tags.length > 0 && (
               <div>
-                <span className="field-label">Tags</span>
+                <span className="field-label">
+                  Tags
+                  <Info text="Colour labels that work across folders, such as Print or Urgent. A code can have several; filter the list by them." />
+                </span>
                 <div className="chips" style={{ marginTop: 6 }}>
                   {data.tags.map((tag) => (
                     <button type="button" key={tag.id} className="chip" aria-pressed={tagIds.includes(tag.id)} onClick={() => setTagIds(tagIds.includes(tag.id) ? tagIds.filter((id) => id !== tag.id) : [...tagIds, tag.id])}>
@@ -302,7 +288,10 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
             )}
             {qrType === "dynamic_url" && (
               <details open={!!(ios || android || expiry)}>
-                <summary>Device routing and expiry</summary>
+                <summary>
+                  Device routing and expiry
+                  <Info text="Send iPhone and Android users to different places, such as each app store, and stop the code working after a date. Everyone else goes to the main destination." />
+                </summary>
                 <div className="stack details-content">
                   <div className="form-grid">
                     <label>
@@ -353,8 +342,17 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
             <>
               <code className="qr-link">{payload}</code>
               <CopyButton value={payload} label="Copy link" notify={notify} />
+              <small>Changing the destination never changes this link or the QR image.</small>
             </>
           )}
+          <label className="toggle-row">
+            <input type="checkbox" checked={withLabel} onChange={(event) => setWithLabel(event.target.checked)} />
+            Add name and number under the QR
+            <Info text="On: copies, downloads and print sheets show the code's name and number below it. Off: just the QR. The choice is remembered on this device. The vector SVG is always the plain QR." />
+          </label>
+          <button className="button block" disabled={!image} onClick={copy}>
+            <ClipboardCopy size={16} /> Copy QR image
+          </button>
           <div className="download-actions">
             <button className="button primary" disabled={!image} onClick={() => download("png")}>
               <Download size={16} /> PNG

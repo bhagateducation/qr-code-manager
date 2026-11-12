@@ -66,9 +66,10 @@ export async function settle(
       workspace.paidUntil > new Date()
         ? workspace.paidUntil.getTime()
         : Date.now();
+    const days = (await tx.plan.findUnique({ where: { id: saved.plan } }))?.days || 30;
     await tx.workspace.update({
       where: { id: saved.workspaceId },
-      data: { plan: saved.plan, paidUntil: new Date(start + 30 * 86400000) },
+      data: { plan: saved.plan, paidUntil: new Date(start + days * 86400000) },
     });
     await tx.auditLog.create({
       data: {

@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { ApiError, authorizeApiKey, boundedText, failure, json, rateLimit } from "@/lib/http";
-import { effectivePlan, limits, qrSchema } from "@/lib/validation";
+import { qrSchema } from "@/lib/validation";
+import { account, over, requireFeature, requireStorage, usage } from "@/lib/plans";
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +34,11 @@ export async function POST(request: NextRequest) {
       throw new ApiError(400, "A QR cannot redirect to another QR resolver on this site.");
     const workspace = await prisma.workspace.findUnique({ where: { id: key.workspaceId } });
     if (!workspace || workspace.suspended) throw new ApiError(403, "This workspace is suspended.");
-    if (await prisma.qRCode.count({ where: { workspaceId: key.workspaceId, deletedAt: null } }) >= limits[effectivePlan(workspace)].codes)
+    const acct = await account(prisma, workspace);
+    requireFeature(acct.limits, "allowApi", "API access");
+    const now = await usage(prisma, acct.ids);
+    requireStorage(acct.limits, now.storageBytes, 600);
+    if (over(acct.limits.codes, now.codes))
       throw new ApiError(409, "Your plan QR limit has been reached.");
     if (qrData.folderId && !(await prisma.folder.findFirst({ where: { id: qrData.folderId, workspaceId: key.workspaceId } })))
       throw new ApiError(404, "Folder not found.");

@@ -485,4 +485,74 @@ check(sheet.data.codes.length === 4 && sheet.data.codes[0].payload.includes("/s/
 check((await request(`/api/workspace/export?kind=sheet&folder=${book.data.entity.id}`, undefined, fresh)).status === 404, "tenant A cannot read tenant B's print sheet");
 check((await act("book.create", { title: "Too big", urlTemplate: "https://example.com/{chapter}/{question}", chapters: [{ name: "One", questions: 200 }] }, undefined, me)).status === 409, "a book cannot exceed the plan's code limit");
 check((await act("book.create", { title: "Bad link", urlTemplate: "http://127.0.0.1/{chapter}/{question}", chapters: [{ name: "One", questions: 1 }] }, undefined, me)).status === 400, "a book link must be a public address");
+
+// --- SaaS platform: link stability, platform owner, plans, payments, panels, storage, domains ---
+const stable = (await act("qr.create", { title: "Stable", targetUrl: "https://example.com/first" }, undefined, me)).data.entity;
+await act("qr.update", { title: "Stable renamed", targetUrl: "https://example.com/second" }, stable.id, me);
+const afterEdit = (await listB("search=Stable")).data.qrCodes.find((qr) => qr.id === stable.id);
+const hop = await request(`/s/${stable.shortCode}`);
+check(afterEdit.shortCode === stable.shortCode && afterEdit.number === stable.number && hop.headers.get("location") === "https://example.com/second", "changing a link keeps the same QR code and redirects to the new link");
+
+// A platform owner for the test, made directly in the local database.
+const { PrismaClient } = await import("@prisma/client");
+const db = new PrismaClient();
+const p = { ...a, name: "QA Platform", email: `qa-p-${suffix}@example.com`, workspace: "QA Platform" };
+const rp = await request("/api/auth/register", p);
+await db.user.update({ where: { email: p.email }, data: { platformAdmin: true } });
+const ownerView = await request("/api/workspace", undefined, rp.cookie);
+check(ownerView.data.workspace.plan === "owner" && ownerView.data.limits.codes === null && ownerView.data.limits.storageMb === null, "the platform owner has no limits");
+const bView = await listB("");
+check(bView.data.limits.codes === 10 && bView.data.limits.storageMb === 1024, "a new client gets the Free plan with 1 GB storage");
+const bId = bView.data.workspace.id;
+const platform = (action, data, id, who = rp.cookie) => request("/api/platform", { action, data, id }, who);
+check((await request("/api/platform", undefined, rp.cookie)).data.clients.some((client) => client.id === bId), "the platform owner sees every client");
+check((await platform("client.plan", { plan: "pro", days: 30 }, bId, me)).status === 403, "a client cannot change plans");
+check((await platform("client.plan", { plan: "pro", days: 30 }, bId)).status === 200 && (await listB("")).data.workspace.plan === "pro", "the owner puts a client on a plan");
+const before = Date.parse((await listB("")).data.workspace.paidUntil);
+await platform("client.extend", 30, bId);
+check(Date.parse((await listB("")).data.workspace.paidUntil) - before >= 29 * 86400000, "the owner extends a subscription");
+check((await platform("client.payment", { amount: 499, method: "upi", note: "QA", plan: "pro", days: 0 }, bId)).status === 200, "the owner records a manual payment");
+check((await request("/api/platform", undefined, rp.cookie)).data.clients.find((client) => client.id === bId).payments.some((payment) => payment.amount === 49900 && payment.method === "upi"), "the payment is in the client's history");
+check((await platform("client.limits", { codes: 999, allowApi: false }, bId)).status === 200 && (await listB("")).data.limits.codes === 999, "the owner sets custom limits for one client");
+check((await act("apiKey.create", { label: "Blocked" }, undefined, me)).status === 403, "a feature switched off for a client is refused");
+await platform("client.limits", { storageMb: 0 }, bId);
+check((await act("qr.create", { title: "Too big", targetUrl: "https://example.com/full" }, undefined, me)).status === 409, "a client whose storage is full cannot add codes");
+await platform("client.limits", {}, bId);
+check((await listB("")).data.limits.codes === 500, "clearing custom limits returns the client to their plan");
+const planSave = await platform("plan.save", { id: `qa-${suffix}`, name: "QA plan", description: null, pricePaise: 9900, days: 7, codes: 5, systems: 1, records: 10, storageMb: 100, panels: null, members: 2, allowApi: false, allowBooks: true, allowDomain: false, isPublic: false, sort: 99 });
+check(planSave.status === 200, "the owner creates a plan");
+check((await platform("plan.delete", undefined, `qa-${suffix}`)).status === 200 && (await platform("plan.delete", undefined, "free")).status === 400, "plans can be deleted, except Free");
+check((await platform("maintenance.run")).status === 200, "reminders and domain checks can be run on demand");
+
+// Panels for a client's teams.
+const panel = await act("panel.create", "QA Branch", undefined, me);
+check(panel.status === 200, "a client owner creates a panel");
+check((await act("panel.create", "Not mine", undefined, viewer.cookie)).status === 403, "a member cannot create panels");
+check((await request("/api/auth/switch", { workspaceId: panel.data.entity.id }, fresh)).status === 404, "another client cannot open the panel");
+await request("/api/auth/switch", { workspaceId: panel.data.entity.id }, me);
+const inPanel = await listB("");
+check(inPanel.data.workspace.isPanel && inPanel.data.workspace.id === panel.data.entity.id, "the owner works inside the panel");
+const panelCode = (await act("qr.create", { title: "Panel code", targetUrl: "https://example.com/panel" }, undefined, me)).data.entity;
+await request("/api/auth/switch", { workspaceId: null }, me);
+const home = await listB("search=Panel code");
+check(!home.data.qrCodes.some((qr) => qr.id === panelCode.id) && home.data.usage.codes === inPanel.data.usage.codes + 1, "panel codes stay in the panel but count toward the account's plan");
+await request("/api/auth/switch", { workspaceId: bId }, rp.cookie);
+check((await request("/api/workspace", undefined, rp.cookie)).data.workspace.id === bId, "the platform owner can open a client's panel");
+await request("/api/auth/switch", { workspaceId: null }, rp.cookie);
+
+// Duplicate, CSV import and custom domain.
+const copy = await act("qr.duplicate", undefined, stable.id, me);
+check(copy.status === 200 && copy.data.entity.number > stable.number && copy.data.entity.shortCode !== stable.shortCode, "duplicating makes a new numbered code");
+const imported = await act("qr.import", [{ title: "Row one", url: "https://example.com/r1", folder: "Imported" }, { title: "Row two", url: "https://example.com/r2" }], undefined, me);
+check(imported.status === 200 && (await listB("search=Row")).data.total === 2 && (await listB("")).data.folders.some((folder) => folder.name === "Imported"), "a CSV import creates codes and their folder");
+check((await act("qr.import", [{ title: "Bad", url: "http://127.0.0.1/x" }], undefined, me)).status === 400, "an import with an unsafe link is refused");
+await platform("client.plan", { plan: "free" }, bId);
+const domainName = "qr-" + suffix + ".example.com";
+check((await act("domain.save", domainName, undefined, me)).status === 403, "custom domains need a plan that allows them");
+await platform("client.limits", { allowDomain: true }, bId);
+check((await act("domain.save", domainName, undefined, me)).status === 200 && (await listB("")).data.domain.status === "pending", "a client adds a custom domain");
+check((await act("domain.use", true, undefined, me)).status === 409 && (await listB("")).data.linkBase === base, "an unverified domain is never printed in QR codes");
+// Only one platform owner may exist; take the test one away again.
+await db.user.update({ where: { email: p.email }, data: { platformAdmin: false } });
+await db.$disconnect();
 console.log(`${passed} integration checks passed.`);

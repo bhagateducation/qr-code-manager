@@ -15,9 +15,20 @@ model Workspace {
   paidUntil   DateTime?
   suspended   Boolean      @default(false)
   qrSeq       Int          @default(0) // last QR number handed out in this workspace
+  parentId    String?      // set on a client's extra panels; the root is the billing account
+  customLimits Json?       // per-client overrides of the plan limits; null value = unlimited
+  notes       String?      @db.Text
+  remindedAt  DateTime?
+  customDomain String?     @unique
+  domainToken String?
+  domainStatus String      @default("none") // none, pending, verified, failing
+  domainCheckedAt DateTime?
+  useCustomDomain Boolean  @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  parent      Workspace?   @relation("Panels", fields: [parentId], references: [id], onDelete: Cascade)
+  panels      Workspace[]  @relation("Panels")
   users       User[]
   systems     System[]
   qrCodes     QRCode[]
@@ -32,6 +43,7 @@ model Workspace {
   payments    Payment[]
   audits      AuditLog[]
 
+  @@index([parentId])
   @@map("workspaces")
 }
 
@@ -321,6 +333,7 @@ model Invitation {
 model Session {
   tokenHash String @id
   userId String
+  workspaceId String? // the panel this session is working in, when not the user's own
   expiresAt DateTime
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -344,6 +357,8 @@ model Payment {
   amount Int
   currency String @default("INR")
   status String @default("created")
+  method String @default("razorpay") // razorpay, cash, upi, bank, other
+  note String?
   createdAt DateTime @default(now())
   paidAt DateTime?
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -359,4 +374,37 @@ model AuditLog {
   createdAt DateTime @default(now())
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@index([workspaceId, createdAt])
+}
+
+// A plan the platform owner sells. Limit columns: null means unlimited.
+model Plan {
+  id          String   @id // slug, e.g. "pro"
+  name        String
+  description String?
+  pricePaise  Int      @default(0)
+  days        Int      @default(30)
+  codes       Int?
+  systems     Int?
+  records     Int?
+  storageMb   Int?
+  panels      Int?
+  members     Int?
+  allowApi    Boolean  @default(true)
+  allowBooks  Boolean  @default(true)
+  allowDomain Boolean  @default(false)
+  isPublic    Boolean  @default(true)
+  sort        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("plans")
+}
+
+// Platform-wide settings and editable website content, stored as JSON per key.
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
 }

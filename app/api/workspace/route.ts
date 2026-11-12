@@ -1,4 +1,5 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -17,9 +18,9 @@ import {
   qrSchema,
   systemSchema,
   validateRecord,
-  limits,
-  effectivePlan,
 } from "@/lib/validation";
+import { account, linkBase, over, requireFeature, requireStorage, usage } from "@/lib/plans";
+import { probeDomain, runMaintenance } from "@/lib/maintenance";
 import { sendWorkspaceInvitationEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
@@ -166,20 +167,27 @@ export async function GET(request: NextRequest) {
       prisma.qRCode.count({ where: { workspaceId, deletedAt: { not: null } } }),
       prisma.folder.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" }, take: 2000, select: { id: true, parentId: true, name: true, kind: true, _count: { select: { qrCodes: { where: { deletedAt: null } } } } } }),
     ]);
+    const atHome = user.workspaceId === user.homeWorkspaceId;
     // The configured owner's existing account becomes the platform owner on installs that have none yet.
     // New registrations of that address are gated separately (see the auth route).
-    if (!user.platformAdmin && user.role === "owner" && process.env.OWNER_EMAIL?.toLowerCase() === user.email && !(await prisma.user.count({ where: { platformAdmin: true } }))) {
+    if (atHome && !user.platformAdmin && user.role === "owner" && process.env.OWNER_EMAIL?.toLowerCase() === user.email && !(await prisma.user.count({ where: { platformAdmin: true } }))) {
       await prisma.user.update({ where: { id: user.id }, data: { platformAdmin: true } });
       user.platformAdmin = true;
     }
-    // The platform owner's own workspace is never limited by a plan.
-    if (user.platformAdmin && effectivePlan(user.workspace) !== "business")
-      user.workspace = await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "business", paidUntil: new Date("2099-12-31") } });
-    const plan = effectivePlan(user.workspace);
-    const prices = {
-      pro: Number(process.env.PLAN_PRO_PAISE || 0),
-      business: Number(process.env.PLAN_BUSINESS_PAISE || 0),
-    };
+    // The platform owner's own workspace has no limits at all.
+    if (atHome && user.platformAdmin && user.workspace.plan !== "owner")
+      user.workspace = await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "owner", paidUntil: null } });
+    const acct = await account(prisma, user.workspace);
+    const manages = user.platformAdmin || (user.homeWorkspaceId === acct.root.id && user.role === "owner");
+    const [used, plans, panels] = await Promise.all([
+      usage(prisma, acct.ids),
+      prisma.plan.findMany({ where: { isPublic: true }, orderBy: { sort: "asc" } }),
+      manages || (user.homeWorkspaceId === acct.root.id && user.role === "admin")
+        ? prisma.workspace.findMany({ where: { parentId: acct.root.id }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, createdAt: true, _count: { select: { qrCodes: { where: { deletedAt: null } }, users: true } } } })
+        : [],
+    ]);
+    // Renewal reminders and domain health checks ride on panel traffic, after the response is sent.
+    after(() => runMaintenance().catch(() => {}));
     return json({
       user: {
         id: user.id,
@@ -189,10 +197,29 @@ export async function GET(request: NextRequest) {
         platformAdmin: user.platformAdmin,
       },
       workspace: {
+        id: user.workspace.id,
         name: user.workspace.name,
-        plan,
-        paidUntil: user.workspace.paidUntil,
+        plan: acct.planId,
+        planName: acct.planId === "owner" ? "Owner" : plans.find((item) => item.id === acct.planId)?.name || acct.planId,
+        paidUntil: acct.root.paidUntil,
+        lapsedPlan: acct.planId === "free" && acct.root.plan !== "free" ? acct.root.plan : null,
+        isPanel: !!user.workspace.parentId,
+        accountName: acct.root.name,
       },
+      account: {
+        manages,
+        panels: panels.map((panel) => ({ ...panel, current: panel.id === user.workspaceId })),
+        rootId: acct.root.id,
+        homeId: user.homeWorkspaceId,
+        homeName: user.homeWorkspaceName,
+        visiting: !atHome,
+      },
+      usage: used,
+      plans,
+      domain: manages
+        ? { name: acct.root.customDomain, status: acct.root.domainStatus, token: acct.root.domainToken, use: acct.root.useCustomDomain, checkedAt: acct.root.domainCheckedAt, target: new URL(process.env.APP_URL!).hostname }
+        : null,
+      linkBase: linkBase(acct.root),
       qrCodes,
       total,
       page,
@@ -215,8 +242,7 @@ export async function GET(request: NextRequest) {
       trashCount,
       folders,
       pageSize: size,
-      limits: limits[plan],
-      prices,
+      limits: acct.limits,
       checkoutReady: !!(
         process.env.RAZORPAY_KEY_ID &&
         process.env.RAZORPAY_KEY_SECRET &&
@@ -244,6 +270,7 @@ export async function POST(request: NextRequest) {
     let oneTimeSecret: string | undefined;
     let invitationEmail = "";
     let invitationRole = "";
+    if (input.action.startsWith("domain.")) return json(await domainAction(user, input));
     const result = await prisma.$transaction(async (tx) => {
       // A workspace row lock serializes quota checks and creates in every instance.
       const workspace = await tx.workspace.update({
@@ -252,7 +279,11 @@ export async function POST(request: NextRequest) {
       });
       if (workspace.suspended)
         throw new ApiError(403, "This workspace is suspended.");
-      const quota = limits[effectivePlan(workspace)];
+      // Limits belong to the client's whole account (main panel plus its panels), so lock its root too.
+      const acct = await account(tx, workspace);
+      if (acct.root.id !== workspace.id) await tx.workspace.update({ where: { id: acct.root.id }, data: { updatedAt: new Date() } });
+      const quota = acct.limits;
+      const ids = acct.ids;
       let entity: { id: string } | null = null;
       // Outbound credentials and endpoints can leak workspace data, so editors cannot manage them.
       if (/^(webhook|apiKey)./.test(input.action) && !["owner", "admin"].includes(user.role))
@@ -298,10 +329,9 @@ export async function POST(request: NextRequest) {
         if (validTags.length !== new Set(tagIds).size)
           throw new ApiError(404, "One or more tags were not found.");
         if (input.action === "qr.create") {
-          if (
-            (await tx.qRCode.count({ where: { workspaceId, deletedAt: null } })) >= quota.codes
-          )
-            throw new ApiError(409, "Your plan QR limit has been reached.");
+          const now = await usage(tx, ids);
+          if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached.");
+          requireStorage(quota, now.storageBytes, 600);
           // The workspace row is locked by this transaction, so numbers never repeat or skip under load.
           const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
           entity = await tx.qRCode.create({
@@ -361,7 +391,7 @@ export async function POST(request: NextRequest) {
           if (!["owner", "admin"].includes(user.role)) throw new ApiError(403, "Only owners and admins can delete permanently.");
           await tx.qRCode.deleteMany({ where: scope });
         } else {
-          if (data.op === "restore" && (await tx.qRCode.count({ where: { workspaceId, deletedAt: null } })) + (await tx.qRCode.count({ where: scope })) > quota.codes)
+          if (data.op === "restore" && over(quota.codes, await tx.qRCode.count({ where: { workspaceId: { in: ids }, deletedAt: null } }), await tx.qRCode.count({ where: scope })))
             throw new ApiError(409, "Restoring these would go over your plan QR limit.");
           await tx.qRCode.updateMany({
             where: scope,
@@ -405,7 +435,10 @@ export async function POST(request: NextRequest) {
         if (!destination.safeParse(fill(1, 1)).success) throw new ApiError(400, "Use a public http or https address for the link.");
         if (new URL(fill(1, 1)).origin === new URL(process.env.APP_URL!).origin && new URL(fill(1, 1)).pathname.startsWith("/s/"))
           throw new ApiError(400, "A QR cannot redirect to another QR resolver on this site.");
-        if ((await tx.qRCode.count({ where: { workspaceId, deletedAt: null } })) + total > quota.codes)
+        requireFeature(quota, "allowBooks", "Book QR");
+        const now = await usage(tx, ids);
+        requireStorage(quota, now.storageBytes, total * 600);
+        if (over(quota.codes, now.codes, total))
           throw new ApiError(409, `This book needs ${total} codes, which is more than your plan has left.`);
         const book = await tx.folder.create({ data: { name: data.title, kind: "book", workspaceId } });
         const chapters = data.chapters.map((chapter) => ({ id: randomUUID(), name: chapter.name, kind: "chapter", parentId: book.id, workspaceId }));
@@ -442,7 +475,7 @@ export async function POST(request: NextRequest) {
       } else if (input.action === "system.create") {
         const data = systemSchema.parse(input.data);
         if (
-          (await tx.system.count({ where: { workspaceId } })) >= quota.systems
+          over(quota.systems, await tx.system.count({ where: { workspaceId: { in: ids } } }))
         )
           throw new ApiError(409, "Your plan system limit has been reached.");
         entity = await tx.system.create({
@@ -478,8 +511,7 @@ export async function POST(request: NextRequest) {
         }
         if (input.action === "record.create") {
           if (
-            (await tx.record.count({ where: { system: { workspaceId } } })) >=
-            quota.records
+            over(quota.records, await tx.record.count({ where: { system: { workspaceId: { in: ids } } } }))
           )
             throw new ApiError(409, "Your plan record limit has been reached.");
           entity = await tx.record.create({
@@ -525,6 +557,7 @@ export async function POST(request: NextRequest) {
         entity = await tx.campaign.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "Campaign not found.");
       } else if (input.action === "webhook.create") {
+        requireFeature(quota, "allowApi", "API access");
         const data = z.object({ url: destination, events: z.array(z.literal("scan.created")).min(1).max(1).default(["scan.created"]) }).parse(input.data);
         oneTimeSecret = `whsec_${randomBytes(24).toString("base64url")}`;
         entity = await tx.webhook.create({ data: { ...data, workspaceId, secret: oneTimeSecret } });
@@ -538,6 +571,7 @@ export async function POST(request: NextRequest) {
         entity = await tx.webhook.deleteMany({ where: { id: input.id, workspaceId } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "Webhook not found.");
       } else if (input.action === "apiKey.create") {
+        requireFeature(quota, "allowApi", "API access");
         const data = z.object({ label: name }).parse(input.data);
         oneTimeSecret = `qrm_live_${randomBytes(24).toString("base64url")}`;
         entity = await tx.apiKey.create({ data: { ...data, workspaceId, prefix: oneTimeSecret.slice(0, 18), tokenHash: createHash("sha256").update(oneTimeSecret).digest("hex") } });
@@ -547,6 +581,8 @@ export async function POST(request: NextRequest) {
         if (!entity) throw new ApiError(404, "API key not found.");
       } else if (input.action === "team.invite") {
         if (user.role !== "owner") throw new ApiError(403, "Only the workspace owner can invite members.");
+        const now = await usage(tx, ids);
+        if (over(quota.members, now.members + now.invites)) throw new ApiError(409, "Your plan's team member limit has been reached.");
         const data = z.object({ email, role: z.enum(["admin", "editor", "viewer"]).default("editor") }).parse(input.data);
         invitationEmail = data.email;
         invitationRole = data.role;
@@ -570,6 +606,76 @@ export async function POST(request: NextRequest) {
         if (!input.id) throw new ApiError(400, "Invitation is required.");
         entity = await tx.invitation.deleteMany({ where: { id: input.id, workspaceId, acceptedAt: null } }).then((r) => (r.count ? { id: input.id! } : null));
         if (!entity) throw new ApiError(404, "Invitation not found.");
+      } else if (input.action.startsWith("panel.")) {
+        if (!(user.platformAdmin || (user.homeWorkspaceId === acct.root.id && user.role === "owner")))
+          throw new ApiError(403, "Only the account owner can manage panels.");
+        if (input.action === "panel.create") {
+          if (over(quota.panels, ids.length - 1)) throw new ApiError(409, "Your plan's panel limit has been reached.");
+          entity = await tx.workspace.create({ data: { name: name.parse(input.data), slug: `panel-${randomBytes(10).toString("hex")}`, parentId: acct.root.id } });
+        } else if (input.action === "panel.rename" || input.action === "panel.delete") {
+          if (!input.id) throw new ApiError(400, "Panel is required.");
+          if (input.action === "panel.delete" && input.id === workspaceId) throw new ApiError(400, "Switch to another panel before deleting this one.");
+          const scope = { id: input.id, parentId: acct.root.id };
+          const changed = input.action === "panel.rename" ? await tx.workspace.updateMany({ where: scope, data: { name: name.parse(input.data) } }) : await tx.workspace.deleteMany({ where: scope });
+          entity = changed.count ? { id: input.id } : null;
+          if (!entity) throw new ApiError(404, "Panel not found.");
+        } else throw new ApiError(400, "Unsupported action.");
+      } else if (input.action === "qr.duplicate") {
+        const source = await tx.qRCode.findFirst({ where: { id: input.id, workspaceId, deletedAt: null }, include: { tags: true } });
+        if (!source) throw new ApiError(404, "QR not found.");
+        const now = await usage(tx, ids);
+        if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached.");
+        requireStorage(quota, now.storageBytes, 600);
+        const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
+        entity = await tx.qRCode.create({
+          data: {
+            workspaceId,
+            number: qrSeq,
+            title: `${source.title} (copy)`.slice(0, 100),
+            type: source.type,
+            targetUrl: source.targetUrl,
+            routingRules: (source.routingRules ?? {}) as Prisma.InputJsonValue,
+            styling: (source.styling ?? {}) as Prisma.InputJsonValue,
+            folderId: source.folderId,
+            recordId: source.recordId,
+            campaignId: source.campaignId,
+            shortCode: randomBytes(9).toString("base64url"),
+            tags: { create: source.tags.map((item) => ({ tagId: item.tagId })) },
+          },
+        });
+      } else if (input.action === "qr.import") {
+        // A CSV import arrives as rows; folders named in the file are found or created at the top level.
+        const rows = z
+          .array(z.object({ title: name, url: destination, folder: z.string().trim().max(100).optional().transform((value) => value || undefined) }))
+          .min(1)
+          .max(250)
+          .parse(input.data);
+        const app = new URL(process.env.APP_URL!);
+        if (rows.some((row) => new URL(row.url).origin === app.origin && new URL(row.url).pathname.startsWith("/s/")))
+          throw new ApiError(400, "A QR cannot redirect to another QR resolver on this site.");
+        const now = await usage(tx, ids);
+        if (over(quota.codes, now.codes, rows.length)) throw new ApiError(409, `These ${rows.length} codes would go over your plan's QR limit.`);
+        requireStorage(quota, now.storageBytes, rows.length * 600);
+        const folderIds = new Map<string, string>();
+        for (const folderName of new Set(rows.flatMap((row) => (row.folder ? [row.folder] : [])))) {
+          const folder = (await tx.folder.findFirst({ where: { workspaceId, parentId: null, name: folderName } })) || (await tx.folder.create({ data: { workspaceId, name: folderName } }));
+          folderIds.set(folderName, folder.id);
+        }
+        const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: rows.length } } });
+        let number = qrSeq - rows.length;
+        await tx.qRCode.createMany({
+          data: rows.map((row) => ({
+            workspaceId,
+            number: ++number,
+            title: row.title,
+            targetUrl: row.url,
+            folderId: row.folder ? folderIds.get(row.folder)! : null,
+            shortCode: randomBytes(9).toString("base64url"),
+            styling: { dark: "#17161D", light: "#FFFFFF", errorCorrectionLevel: "M" },
+            routingRules: {},
+          })),
+        });
+        entity = { id: workspaceId };
       } else if (input.action === "workspace.rename") {
         if (user.role !== "owner")
           throw new ApiError(
@@ -599,4 +705,39 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return failure(error);
   }
+}
+
+/** Custom domain set-up. Runs outside the write transaction because it does DNS and HTTPS lookups. */
+async function domainAction(user: Awaited<ReturnType<typeof authorize>>, input: { action: string; data?: unknown }) {
+  const acct = await account(prisma, user.workspace);
+  if (!(user.platformAdmin || (user.homeWorkspaceId === acct.root.id && user.role === "owner")))
+    throw new ApiError(403, "Only the account owner can set up a custom domain.");
+  requireFeature(acct.limits, "allowDomain", "Custom domains");
+  const root = acct.root;
+  let result: Record<string, unknown> = { ok: true };
+  if (input.action === "domain.save") {
+    const domain = z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "Enter a domain such as qr.yourbrand.com.")
+      .parse(input.data);
+    if (domain === new URL(process.env.APP_URL!).hostname) throw new ApiError(400, "That is already the main domain.");
+    await prisma.workspace.update({ where: { id: root.id }, data: { customDomain: domain, domainToken: `qrm-${randomBytes(12).toString("hex")}`, domainStatus: "pending", useCustomDomain: false, domainCheckedAt: null } });
+  } else if (input.action === "domain.check") {
+    if (!root.customDomain) throw new ApiError(400, "Add a domain first.");
+    await rateLimit(`domain:${root.id}`, 20, 3600);
+    const { txt, live } = await probeDomain(root.customDomain, root.domainToken);
+    const status = txt && live ? "verified" : root.domainStatus === "verified" ? "failing" : "pending";
+    await prisma.workspace.update({ where: { id: root.id }, data: { domainStatus: status, domainCheckedAt: new Date() } });
+    result = { ok: true, txt, live, status };
+  } else if (input.action === "domain.use") {
+    const on = z.boolean().parse(input.data);
+    if (on && root.domainStatus !== "verified") throw new ApiError(409, "Verify the domain before using it in QR codes.");
+    await prisma.workspace.update({ where: { id: root.id }, data: { useCustomDomain: on } });
+  } else if (input.action === "domain.remove") {
+    await prisma.workspace.update({ where: { id: root.id }, data: { customDomain: null, domainToken: null, domainStatus: "none", useCustomDomain: false, domainCheckedAt: null } });
+  } else throw new ApiError(400, "Unsupported action.");
+  await prisma.auditLog.create({ data: { workspaceId: user.workspaceId, actorId: user.id, action: input.action, entityId: root.id } });
+  return result;
 }

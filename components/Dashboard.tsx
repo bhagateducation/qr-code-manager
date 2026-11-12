@@ -13,12 +13,14 @@ import {
   ChevronRight,
   Code2,
   CreditCard,
+  Gem,
+  Globe,
+  LayoutGrid,
   HelpCircle,
   Home,
   KeyRound,
   Layers,
   LogOut,
-  Megaphone,
   Menu,
   Moon,
   Plus,
@@ -33,11 +35,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
-import { api, Ctx, Data, Filters, Modal, QR, ThemeControl, noFilters, viewMotion } from "./ui";
+import { api, Ctx, Data, Filters, Info, Modal, QR, ThemeControl, formatDate, noFilters, viewMotion } from "./ui";
 import Overview from "./Overview";
 import QRCodes from "./QRCodes";
-import { ApiKeys, Campaigns, Tags, Webhooks } from "./Connect";
-import { AuditLog, Billing, Clients, Help, SettingsPanel, Team } from "./Workspace";
+import { ApiKeys, Tags, Webhooks } from "./Connect";
+import { AuditLog, Billing, Help, SettingsPanel, Team } from "./Workspace";
+import { Panels } from "./Account";
 
 // The heavier views load only when opened, keeping the first dashboard paint small.
 const loading = () => <div className="skeleton" style={{ height: 320 }} />;
@@ -45,24 +48,30 @@ const QRStudio = dynamic(() => import("./QRStudio"), { loading });
 const Systems = dynamic(() => import("./Systems"), { loading });
 const Analytics = dynamic(() => import("./Analytics"), { loading });
 const Books = dynamic(() => import("./Books"), { loading });
+// Platform-owner screens are only downloaded by the platform owner.
+const Clients = dynamic(() => import("./Owner").then((module) => module.Clients), { loading });
+const Plans = dynamic(() => import("./Owner").then((module) => module.Plans), { loading });
+const Website = dynamic(() => import("./Owner").then((module) => module.Website), { loading });
 
 // Each module owns one hue, used for its icon everywhere it appears.
-const navigation = [
-  { id: "overview", label: "Home", icon: Home, tone: "var(--brand)", group: "", hint: "Your workspace at a glance" },
-  { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "", hint: "Create, edit and download your codes" },
-  { id: "books", label: "Book QR", icon: BookOpen, tone: "var(--c-orange)", group: "", hint: "A QR code for every question of a book, sorted by chapter" },
-  { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "", hint: "Scans, devices and busiest times" },
-  { id: "systems", label: "Systems & records", icon: Layers, tone: "var(--c-violet)", group: "Organise", hint: "Your own tables, with a public page per record" },
-  { id: "campaigns", label: "Campaigns", icon: Megaphone, tone: "var(--c-pink)", group: "Organise", hint: "Group codes that belong to one campaign" },
-  { id: "tags", label: "Tags", icon: Tag, tone: "var(--c-amber)", group: "Organise", hint: "Colour labels for sorting codes" },
-  { id: "webhooks", label: "Webhooks", icon: Code2, tone: "var(--c-teal)", group: "Developers", hint: "Get a signed event on every scan" },
-  { id: "apiKeys", label: "API keys", icon: KeyRound, tone: "var(--c-orange)", group: "Developers", hint: "Create and list codes from your own software" },
-  { id: "team", label: "Team", icon: Users, tone: "var(--c-sky)", group: "Workspace", hint: "Members, roles and invitations" },
-  { id: "billing", label: "Plan & billing", icon: CreditCard, tone: "var(--c-green)", group: "Workspace", hint: "Your plan, usage and payments" },
-  { id: "activity", label: "Audit log", icon: Activity, tone: "var(--c-slate)", group: "Workspace", hint: "Every saved change, newest first" },
-  { id: "settings", label: "Settings", icon: Settings, tone: "var(--c-slate)", group: "Workspace", hint: "Workspace name, password and two-step sign-in" },
-  { id: "help", label: "Help", icon: HelpCircle, tone: "var(--c-teal)", group: "Workspace", hint: "Answers and support" },
-  { id: "clients", label: "Clients", icon: Building2, tone: "var(--c-pink)", group: "Platform", hint: "Every customer workspace", platform: true },
+const navigation: { id: string; label: string; icon: LucideIcon; tone: string; group: string; hint: string; help: string; platform?: boolean; account?: boolean }[] = [
+  { id: "overview", label: "Home", icon: Home, tone: "var(--brand)", group: "", hint: "Your workspace at a glance", help: "A summary of this panel: scans this week, your most scanned codes, what your plan allows and how much storage is used." },
+  { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "", hint: "Create, find, copy and download your codes", help: "Every code has a number such as QR-00042. Open folders by clicking them, search by number, name or link, and tick several codes to pause, move or trash them together. Changing a website code's link never changes its image." },
+  { id: "books", label: "Book QR", icon: BookOpen, tone: "var(--c-orange)", group: "", hint: "A QR code for every question of a book, sorted by chapter", help: "For books and question banks. Enter the book's name, a link pattern and how many questions each chapter has; one click makes a folder per chapter and a numbered QR for every question." },
+  { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "", hint: "Scans, devices and busiest times", help: "How often your codes are scanned, from which kinds of phone, and at what times. Choose a period at the top; export every scan as CSV." },
+  { id: "systems", label: "Systems & records", icon: Layers, tone: "var(--c-violet)", group: "Organise", hint: "Your own tables, with a public page per record", help: "Make your own table (a system), such as Products or Students, with the fields you need. Publish a record to get a public page, then point a QR code at it." },
+  { id: "tags", label: "Tags", icon: Tag, tone: "var(--c-amber)", group: "Organise", hint: "Colour labels for sorting codes", help: "Tags are coloured labels that work across folders, like Print or Urgent. Add them to codes in the editor and filter the list by them." },
+  { id: "webhooks", label: "Webhooks", icon: Code2, tone: "var(--c-teal)", group: "Developers", hint: "Get a signed event on every scan", help: "For developers: we send a signed message to your server each time one of your codes is scanned." },
+  { id: "apiKeys", label: "API keys", icon: KeyRound, tone: "var(--c-orange)", group: "Developers", hint: "Create and list codes from your own software", help: "For developers: a key lets your own software create and list codes in this panel." },
+  { id: "team", label: "Team", icon: Users, tone: "var(--c-sky)", group: "Workspace", hint: "Members, roles and invitations", help: "Invite people to this panel. Admins manage almost everything, editors create and change codes, viewers can only look and download." },
+  { id: "panels", label: "Panels", icon: LayoutGrid, tone: "var(--c-violet)", group: "Workspace", hint: "Separate panels for branches, teams or employees", help: "A panel is a separate workspace inside your account, with its own codes, folders and members. Make one per branch or department; your plan's limits are shared across all panels.", account: true },
+  { id: "billing", label: "Plan & billing", icon: CreditCard, tone: "var(--c-green)", group: "Workspace", hint: "Your plan, usage, storage and payments", help: "See what your plan allows and how much you use, including storage. Paid plans do not renew on their own; renew here before the end date." },
+  { id: "activity", label: "Audit log", icon: Activity, tone: "var(--c-slate)", group: "Workspace", hint: "Every saved change, newest first", help: "A record of who changed what in this panel." },
+  { id: "settings", label: "Settings", icon: Settings, tone: "var(--c-slate)", group: "Workspace", hint: "Name, password, two-step sign-in and your domain", help: "Rename the workspace, change your password, protect sign-in with a code from your phone, and connect your own domain." },
+  { id: "help", label: "Help", icon: HelpCircle, tone: "var(--c-teal)", group: "Workspace", hint: "Answers and support", help: "Short answers to common questions, and how to reach support." },
+  { id: "clients", label: "Clients", icon: Building2, tone: "var(--c-pink)", group: "Platform", hint: "Every customer account, their usage and payments", help: "Only you, the platform owner, see this. Open a client to change their plan, extend it, record a payment, give them custom limits or storage, add notes, open their panel or suspend them.", platform: true },
+  { id: "plans", label: "Plans", icon: Gem, tone: "var(--c-amber)", group: "Platform", hint: "What each plan costs and allows", help: "Create and edit the plans clients buy: price, length, limits (or unlimited), storage, panels and features. Changes apply at once to every client on the plan.", platform: true },
+  { id: "website", label: "Website", icon: Globe, tone: "var(--c-sky)", group: "Platform", hint: "Edit your public home page", help: "Change the headline, text, sections and questions on your home page. Prices on the website come from Plans.", platform: true },
 ];
 type Toast = { id: number; message: string; kind: "ok" | "error" };
 type Confirm = Parameters<Ctx["ask"]>[0] & { resolve: (value: boolean) => void };
@@ -156,7 +165,8 @@ export default function Dashboard() {
 
   const role = data?.user.role || "viewer";
   const canWrite = ["owner", "admin", "editor"].includes(role);
-  const items = useMemo(() => navigation.filter((item) => !item.platform || data?.user.platformAdmin), [data?.user.platformAdmin]);
+  const showPanels = !!data && (data.account.manages || data.account.panels.length > 0);
+  const items = useMemo(() => navigation.filter((item) => (!item.platform || data?.user.platformAdmin) && (!item.account || showPanels)), [data?.user.platformAdmin, showPanels]);
   // Everything you can create, in one list. Shared by the New menu and the command palette.
   const creators = useMemo<Command[]>(
     () =>
@@ -165,12 +175,12 @@ export default function Dashboard() {
             { label: "New QR code", icon: QrCode, tone: "var(--c-blue)", group: "Create", run: () => openStudio(null) },
             { label: "New book QR set", icon: BookOpen, tone: "var(--c-orange)", group: "Create", run: () => go("books") },
             { label: "New system", icon: Layers, tone: "var(--c-violet)", group: "Create", run: () => go("systems") },
-            { label: "New campaign", icon: Megaphone, tone: "var(--c-pink)", group: "Create", run: () => go("campaigns") },
             { label: "New tag", icon: Tag, tone: "var(--c-amber)", group: "Create", run: () => go("tags") },
+            ...(data?.account.manages ? [{ label: "New panel", icon: LayoutGrid, tone: "var(--c-violet)", group: "Create", run: () => go("panels") }] : []),
             ...(role === "owner" ? [{ label: "Invite a teammate", icon: UserPlus, tone: "var(--c-sky)", group: "Create", run: () => go("team") }] : []),
           ]
         : [],
-    [canWrite, role, go, openStudio],
+    [canWrite, role, go, openStudio, data?.account.manages],
   );
   const commands = useMemo<Command[]>(() => {
     const term = search.trim().toLowerCase();
@@ -235,6 +245,14 @@ export default function Dashboard() {
       setFilters({ ...noFilters, folder: id, sort: "number" });
       go("codes");
     },
+    switchPanel: async (id) => {
+      try {
+        await api("/api/auth/switch", { workspaceId: id });
+        window.location.assign("/dashboard");
+      } catch (e) {
+        notify((e as Error).message, "error");
+      }
+    },
     ask: (options) => new Promise((resolve) => setConfirm({ ...options, resolve })),
     mutate: async (action, payload, id) => {
       try {
@@ -261,7 +279,10 @@ export default function Dashboard() {
     setNewMenu(false);
     command.run();
   };
-  const usage = Math.min(100, Math.round((data.codeCount / data.limits.codes) * 100));
+  const usage = data.limits.codes ? Math.min(100, Math.round((data.usage.codes / data.limits.codes) * 100)) : 0;
+  const daysLeft = data.workspace.paidUntil ? Math.ceil((Date.parse(data.workspace.paidUntil) - Date.now()) / 86400000) : null;
+  // Every panel this person can open: their own, the client's main panel when visiting, and the account's panels.
+  const places = [{ id: data.account.homeId, name: `${data.account.homeName}${data.user.platformAdmin ? " (yours)" : ""}` }, ...(data.account.rootId !== data.account.homeId ? [{ id: data.account.rootId, name: `${data.workspace.accountName} · main` }] : []), ...data.account.panels.map((panel) => ({ id: panel.id, name: panel.name }))];
 
   return (
     <MotionConfig reducedMotion="user">
@@ -273,12 +294,21 @@ export default function Dashboard() {
             </Link>
             <div className="grow">
               <strong className="truncate">{data.workspace.name}</strong>
-              <small>{data.workspace.plan} plan</small>
+              <small>{data.workspace.isPanel ? `Panel of ${data.workspace.accountName}` : `${data.workspace.planName} plan`}</small>
             </div>
             <button className="side-close icon-button" aria-label="Close navigation" onClick={() => setDrawer(false)}>
               <X size={18} />
             </button>
           </div>
+          {places.length > 1 && (
+            <select className="panel-switch" aria-label="Switch panel" value={data.workspace.id} onChange={(event) => ctx.switchPanel(event.target.value === data.account.homeId ? null : event.target.value)}>
+              {places.map((place) => (
+                <option key={place.id} value={place.id}>
+                  {place.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             className="side-search"
             onClick={() => {
@@ -308,12 +338,12 @@ export default function Dashboard() {
             ))}
           </nav>
           <div className="side-foot">
-            {data.workspace.plan !== "business" && (
+            {data.limits.codes !== null && (
               <div className="side-plan">
                 <div className="meter-row">
                   <span>QR codes used</span>
                   <span className="muted">
-                    {data.codeCount.toLocaleString()} / {data.limits.codes.toLocaleString()}
+                    {data.usage.codes.toLocaleString()} / {data.limits.codes.toLocaleString()}
                   </span>
                 </div>
                 <div className="meter-track">
@@ -373,6 +403,34 @@ export default function Dashboard() {
           </header>
 
           <main className="content">
+            {data.account.visiting && data.user.platformAdmin && data.account.rootId !== data.account.homeId && (
+              <div className="banner info">
+                <span className="grow">You are working inside {data.workspace.accountName}&apos;s account as the platform owner. Changes you make here are saved in their workspace.</span>
+                <button className="button small" onClick={() => ctx.switchPanel(null)}>
+                  Back to my panel
+                </button>
+              </div>
+            )}
+            {data.account.manages && !data.account.visiting && (data.workspace.lapsedPlan || (daysLeft !== null && daysLeft <= 7 && data.workspace.plan !== "free" && data.workspace.plan !== "owner")) && (
+              <div className="banner warn">
+                <span className="grow">
+                  {data.workspace.lapsedPlan
+                    ? "Your paid plan has ended, so Free limits apply. Your QR codes still work."
+                    : `Your ${data.workspace.planName} plan ends on ${formatDate(data.workspace.paidUntil!)}${daysLeft! <= 0 ? "" : ` — ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`}.`}
+                </span>
+                <button className="button small" onClick={() => go("billing")}>
+                  Renew
+                </button>
+              </div>
+            )}
+            {data.domain?.use && data.domain.status === "failing" && (
+              <div className="banner warn">
+                <span className="grow">Your domain {data.domain.name} is not working. New QR images use our domain until it is fixed.</span>
+                <button className="button small" onClick={() => go("settings")}>
+                  Check domain
+                </button>
+              </div>
+            )}
             <AnimatePresence mode="wait">
               <motion.div key={view + (editing !== undefined ? `-studio-${editing?.id || "new"}` : "")} {...viewMotion}>
                 {view !== "overview" && editing === undefined && (
@@ -382,7 +440,10 @@ export default function Dashboard() {
                         <current.icon size={20} />
                       </span>
                       <div>
-                        <h1>{current.label}</h1>
+                        <h1>
+                          {current.label}
+                          <Info text={current.help} label={`About ${current.label}`} />
+                        </h1>
                         <p>{current.hint}</p>
                       </div>
                     </div>
@@ -398,7 +459,7 @@ export default function Dashboard() {
                     ))}
                   {view === "books" && <Books ctx={ctx} />}
                   {view === "systems" && <Systems ctx={ctx} />}
-                  {view === "campaigns" && <Campaigns ctx={ctx} />}
+                  {view === "panels" && <Panels ctx={ctx} />}
                   {view === "tags" && <Tags ctx={ctx} />}
                   {view === "analytics" && <Analytics ctx={ctx} />}
                   {view === "webhooks" && <Webhooks ctx={ctx} />}
@@ -409,6 +470,8 @@ export default function Dashboard() {
                   {view === "settings" && <SettingsPanel ctx={ctx} />}
                   {view === "help" && <Help ctx={ctx} />}
                   {view === "clients" && data.user.platformAdmin && <Clients ctx={ctx} />}
+                  {view === "plans" && data.user.platformAdmin && <Plans ctx={ctx} />}
+                  {view === "website" && data.user.platformAdmin && <Website ctx={ctx} />}
                 </div>
               </motion.div>
             </AnimatePresence>

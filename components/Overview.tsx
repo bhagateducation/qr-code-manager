@@ -2,16 +2,16 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, BarChart3, Check, Layers, QrCode, ScanLine, Users } from "lucide-react";
-import { api, Ctx, Empty, QR, formatDateTime } from "./ui";
+import { api, Ctx, Drive, Empty, QR, formatDateTime, limitText } from "./ui";
 
-export function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
-  const share = Math.min(100, Math.round((used / limit) * 100));
+export function Meter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  const share = limit === null ? 0 : limit === 0 ? 100 : Math.min(100, Math.round((used / limit) * 100));
   return (
     <div className="meter">
       <div className="meter-row">
         <span>{label}</span>
         <span className="muted">
-          {used.toLocaleString()} / {limit.toLocaleString()}
+          {used.toLocaleString()} / {limitText(limit)}
         </span>
       </div>
       <div className="meter-track" role="progressbar" aria-label={label} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
@@ -152,16 +152,19 @@ export default function Overview({ ctx, openStudio }: { ctx: Ctx; openStudio: (q
           <div className="panel stack">
             <div className="panel-heading" style={{ marginBottom: 0 }}>
               <h2>Plan usage</h2>
-              <span className="badge">{data.workspace.plan}</span>
+              <span className="badge">{data.workspace.planName}</span>
             </div>
             <div style={tone("var(--c-blue)")}>
-              <Meter label="QR codes" used={data.codeCount} limit={data.limits.codes} />
+              <Meter label="QR codes" used={data.usage.codes} limit={data.limits.codes} />
             </div>
             <div style={tone("var(--c-violet)")}>
-              <Meter label="Systems" used={data.systems.length} limit={data.limits.systems} />
+              <Meter label="Systems" used={data.usage.systems} limit={data.limits.systems} />
             </div>
             <div style={tone("var(--c-pink)")}>
-              <Meter label="Records" used={data.recordCount} limit={data.limits.records} />
+              <Meter label="Records" used={data.usage.records} limit={data.limits.records} />
+            </div>
+            <div>
+              <Drive used={data.usage.storageBytes} limitMb={data.limits.storageMb} />
             </div>
           </div>
           <div className="panel flush">

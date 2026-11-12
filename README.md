@@ -2,7 +2,7 @@
 
 A multi-tenant QR code SaaS: numbered dynamic QR codes with search, bulk actions and a 30-day trash, custom business records with public pages, scan analytics, teams, API keys, webhooks and Razorpay billing. Built with Next.js (App Router), React, TypeScript, Prisma and MySQL.
 
-Each customer signs up into their own workspace. One platform owner account sees every workspace in a **Clients** panel and can suspend a client or grant a plan by hand.
+Each customer signs up into their own account and can add extra **panels** for branches or teams. Exactly one **platform owner** (you) has no limits and runs the business from the same panel: **Clients** (usage, plans, extensions, manual payments, custom limits and storage, notes, suspend, open their panel), **Plans** (prices, limits, features) and **Website** (home page text and sections).
 
 ## Run locally
 
@@ -21,7 +21,7 @@ npm run dev
 | --- | --- |
 | `npm run lint` | TypeScript |
 | `npm test` | Validation, payment signatures, QR decode for every colour and correction level |
-| `node tests/integration.mjs` | 116 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
+| `node tests/integration.mjs` | 144 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
 
 ## Structure
 
@@ -39,6 +39,12 @@ npm run dev
 | `app/api/platform` | Platform owner: list, suspend and set the plan of client workspaces. |
 | `app/s/[code]` | Public scan resolver. Logs the scan, then redirects. Webhooks fire after the response. |
 | `app/api/v1/qr` | Public API, authenticated with an `x-api-key` header. |
+| `lib/plans.ts` | Plan limits for an account (main panel plus its panels), usage and storage estimate, custom-domain link base. |
+| `lib/maintenance.ts` | Renewal reminders and domain health checks, run every 6 hours from panel traffic or on demand. |
+| `lib/site.ts` | Editable home-page content with safe defaults. |
+| `components/Owner.tsx` | Platform owner: Clients, Plans, Website. |
+| `components/Account.tsx` | Panels and custom-domain set-up. |
+| `components/FolderPicker.tsx` | Folder tree with search and in-place folder creation. |
 | `lib/brand.ts` | Product name and support email, set with `NEXT_PUBLIC_BRAND_NAME` and `NEXT_PUBLIC_SUPPORT_EMAIL`. |
 
 ## Roles
