@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Download, PencilLine, QrCode, ScanLine, Search, ShieldCheck, Smartphone, Trash2, Users } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { getPublicPlans, getSite } from "@/lib/site";
+import { getSiteOrigin } from "@/lib/site-origin";
 import Reveal from "@/components/Reveal";
 import { LiveDemo, ScrollBar, SiteMotion, SwapDemo, Tile } from "@/components/SiteDemo";
 import { ThemeControl } from "@/components/ui";
@@ -10,6 +12,22 @@ const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
 const week = [38, 52, 44, 71, 63, 88, 100];
 // The page is rebuilt at most once a minute, and straight away when the owner saves it in the panel.
 export const revalidate = 60;
+
+const title = `${BRAND} — Dynamic QR codes for your business`;
+const description = "Create dynamic QR codes, change their destinations after printing, and track scans from one workspace.";
+const siteOrigin = getSiteOrigin();
+
+export const metadata: Metadata = {
+  title: { absolute: title },
+  description,
+  ...(siteOrigin && {
+    alternates: { canonical: "/" },
+    robots: { index: true, follow: true },
+    openGraph: { type: "website", url: "/", siteName: BRAND, title, description },
+    twitter: { card: "summary_large_image", title, description, images: ["/opengraph-image"] },
+  }),
+};
+
 const limitLine = (value: number | null, word: string) => `${value === null ? "Unlimited" : value.toLocaleString()} ${word}`;
 
 export default async function Home() {
@@ -251,7 +269,7 @@ export default async function Home() {
                   </p>
                   {plan.description && <p className="muted">{plan.description}</p>}
                   <ul>
-                    {[limitLine(plan.codes, "QR codes"), plan.storageMb === null ? "Unlimited storage" : `${plan.storageMb >= 1024 ? `${plan.storageMb / 1024} GB` : `${plan.storageMb} MB`} storage`, limitLine(plan.members, "team members"), limitLine(plan.panels, "extra panels"), ...(plan.allowBooks ? ["Book QR"] : []), ...(plan.allowDomain ? ["Your own domain"] : []), "Folders, trash and audit log"].map((line) => (
+                    {[limitLine(plan.codes, "QR codes"), plan.storageMb === null ? "Unlimited storage" : `${plan.storageMb >= 1024 ? `${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(plan.storageMb / 1024)} GB` : `${plan.storageMb} MB`} storage`, limitLine(plan.members, "team members"), limitLine(plan.panels, "extra panels"), ...(plan.allowBooks ? ["Book QR"] : []), ...(plan.allowDomain ? ["Your own domain"] : []), "Folders, trash and audit log"].map((line) => (
                       <li key={line}>
                         <Check size={16} /> {line}
                       </li>

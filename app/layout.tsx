@@ -5,8 +5,11 @@ import "@fontsource/poppins/600.css";
 import "@fontsource/poppins/700.css";
 import "./app.css";
 import { BRAND } from "@/lib/brand";
+import { getSiteOrigin } from "@/lib/site-origin";
 
 export const metadata: Metadata = {
+  metadataBase: getSiteOrigin(),
+  robots: { index: false, follow: true },
   title: { default: `${BRAND} — Dynamic QR codes for your business`, template: `%s | ${BRAND}` },
   description:
     "Create dynamic QR codes, manage structured business records, and measure scan activity in one workspace.",
