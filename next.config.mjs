@@ -34,9 +34,9 @@ export default {
         destination: "/dashboard",
         permanent: false,
       })),
-      { source: "/login.html", destination: "/login", permanent: false },
-      { source: "/register.html", destination: "/register", permanent: false },
-      { source: "/index.html", destination: "/", permanent: false },
+      { source: "/login.html", destination: "/login", permanent: true },
+      { source: "/register.html", destination: "/register", permanent: true },
+      { source: "/index.html", destination: "/", permanent: true },
     ];
   },
 };

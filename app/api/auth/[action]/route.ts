@@ -114,11 +114,21 @@ export async function POST(
         if (!credentials.mfaCode) return json({ mfaRequired: true });
         const code = credentials.mfaCode.trim().toUpperCase();
         const backups = Array.isArray(user.backupCodes) ? (user.backupCodes as string[]) : [];
-        if (backups.includes(code))
-          // Backup codes are single-use.
-          await prisma.user.update({ where: { id: user.id }, data: { backupCodes: backups.filter((item) => item !== code) } });
-        else if (!user.mfaSecret || !verifyTotp(user.mfaSecret, code))
+        if (backups.includes(code)) {
+          const consumed = await prisma.user.updateMany({
+            where: {
+              id: user.id,
+              mfaEnabled: true,
+              mfaSecret: user.mfaSecret,
+              backupCodes: { equals: backups },
+            },
+            data: { backupCodes: backups.filter((item) => item !== code) },
+          });
+          if (consumed.count !== 1)
+            throw new ApiError(401, "Invalid or already used backup code.");
+        } else if (!user.mfaSecret || !verifyTotp(user.mfaSecret, code)) {
           throw new ApiError(401, "Invalid authenticator code.");
+        }
       }
     }
     const verificationRequired =

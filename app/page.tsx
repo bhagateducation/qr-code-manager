@@ -4,6 +4,7 @@ import { ArrowRight, Check, Download, PencilLine, QrCode, ScanLine, Search, Shie
 import { BRAND } from "@/lib/brand";
 import { getPublicPlans, getSite } from "@/lib/site";
 import { getSiteOrigin } from "@/lib/site-origin";
+import { checkoutConfigured } from "@/lib/payments";
 import Reveal from "@/components/Reveal";
 import { LiveDemo, ScrollBar, SiteMotion, SwapDemo, Tile } from "@/components/SiteDemo";
 import { ThemeControl } from "@/components/ui";
@@ -39,6 +40,7 @@ export default async function Home() {
     name: BRAND,
     url: siteOrigin.href,
   }).replace(/</g, "\\u003c");
+  const checkoutReady = checkoutConfigured();
   const free = plans.find((plan) => plan.id === "free");
   // The plan in the middle is highlighted, as the usual pick.
   const featured = plans.length > 2 ? plans[Math.floor(plans.length / 2)].id : plans.at(-1)?.id;
@@ -265,7 +267,9 @@ export default async function Home() {
         <section id="pricing" className="site-section">
           <Reveal className="section-intro">
             <h2 className="display">Simple plans that grow with you</h2>
-            <p>Start free. Paid plans run for their period and never renew on their own.</p>
+            <p>{checkoutReady
+              ? "Start free. Paid plans run for their period and never renew on their own."
+              : "Free accounts are available. Online checkout for paid plans is currently unavailable."}</p>
           </Reveal>
           <div className="plans-grid">
             {plans.map((plan, index) => {

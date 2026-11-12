@@ -11,7 +11,7 @@ import {
   rateLimit,
   boundedText,
 } from "@/lib/http";
-import { razorpay, settle } from "@/lib/payments";
+import { checkoutConfigured, razorpay, settle } from "@/lib/payments";
 import { validSignature } from "@/lib/payment-signature";
 export async function POST(
   request: NextRequest,
@@ -55,7 +55,7 @@ export async function POST(
       if (
         !Number.isSafeInteger(amount) ||
         amount < 100 ||
-        !process.env.RAZORPAY_WEBHOOK_SECRET
+        !checkoutConfigured()
       )
         throw new ApiError(503, "Paid plans are not available yet.");
       const order = await razorpay("orders", {

@@ -22,6 +22,7 @@ import {
 import { account, linkBase, over, requireFeature, requireStorage, usage } from "@/lib/plans";
 import { probeDomain, runMaintenance } from "@/lib/maintenance";
 import { sendWorkspaceInvitationEmail } from "@/lib/email";
+import { checkoutConfigured } from "@/lib/payments";
 
 export async function GET(request: NextRequest) {
   try {
@@ -237,11 +238,7 @@ export async function GET(request: NextRequest) {
       folders,
       pageSize: size,
       limits: acct.limits,
-      checkoutReady: !!(
-        process.env.RAZORPAY_KEY_ID &&
-        process.env.RAZORPAY_KEY_SECRET &&
-        process.env.RAZORPAY_WEBHOOK_SECRET
-      ),
+      checkoutReady: checkoutConfigured(),
       appUrl: process.env.APP_URL,
     });
   } catch (error) {

@@ -1,14 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { body, failure, json, rateLimit } from "@/lib/http";
+import { ApiError, body, failure, json, rateLimit } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { email } from "@/lib/validation";
-import { sendEmailVerificationEmail } from "@/lib/email";
+import { emailDeliveryConfigured, sendEmailVerificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
     const input = z.object({ email }).parse(await body(request));
+    if (!emailDeliveryConfigured()) throw new ApiError(503, "Verification email is currently unavailable.");
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     await rateLimit(`email-verification:${ip}`, 10);
     const user = await prisma.user.findUnique({ where: { email: input.email } });
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       const link = `${process.env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
       await sendEmailVerificationEmail(user.email, link);
     }
-    return json({ ok: true, message: "If an unverified account exists for that email, verification instructions have been sent." });
+    return json({ ok: true, message: "If an unverified account exists for that email, check your inbox and spam folder for a verification link." });
   } catch (error) {
     return failure(error);
   }

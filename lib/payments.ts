@@ -1,6 +1,14 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { ApiError } from "./http";
+export function checkoutConfigured() {
+  return Boolean(
+    process.env.RAZORPAY_KEY_ID &&
+    process.env.RAZORPAY_KEY_SECRET &&
+    process.env.RAZORPAY_WEBHOOK_SECRET,
+  );
+}
+
 export async function razorpay(path: string, data?: unknown) {
   const key = process.env.RAZORPAY_KEY_ID,
     secret = process.env.RAZORPAY_KEY_SECRET;

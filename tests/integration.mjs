@@ -422,8 +422,11 @@ check(enabled.status === 200 && enabled.data.backupCodes.length === 8, "MFA enab
 check((await request("/api/auth/login", { email: b.email, password })).data.mfaRequired === true, "login asks for second step");
 check((await request("/api/auth/login", { email: b.email, password, mfaCode: "000000" })).status === 401, "wrong second-step code denied");
 const backup = enabled.data.backupCodes[0];
-check((await request("/api/auth/login", { email: b.email, password, mfaCode: backup })).status === 200, "backup code signs in");
-check((await request("/api/auth/login", { email: b.email, password, mfaCode: backup })).status === 401, "backup code is single-use");
+const backupAttempts = await Promise.all([
+  request("/api/auth/login", { email: b.email, password, mfaCode: backup }),
+  request("/api/auth/login", { email: b.email, password, mfaCode: backup }),
+]);
+check(backupAttempts.map((attempt) => attempt.status).sort().join(",") === "200,401", "only one simultaneous sign-in consumes a backup code");
 check((await request("/api/account/mfa", { action: "disable" }, rb.cookie)).status === 400, "MFA cannot be disabled without a code");
 check((await request("/api/account/mfa", { action: "disable", code: totp(setup.data.secret) }, rb.cookie)).status === 200, "MFA disabled with a valid code");
 
