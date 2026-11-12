@@ -383,6 +383,10 @@ pre.snippet { margin: 0; padding: 12px 14px; border-radius: var(--r-s); backgrou
 .site-nav { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid var(--line); }
 .site-nav > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: var(--wrap); margin: 0 auto; min-height: 64px; }
 .site-nav nav { display: flex; gap: 2px; }
+.site-nav .site-mobile-signin { display: none; }
+.site-skip { position: fixed; z-index: 31; top: 8px; left: 8px; transform: translateY(calc(-100% - 12px)); }
+.site-skip:focus { transform: none; }
+.site main[id], .site section[id] { scroll-margin-top: 76px; }
 .site-nav nav a { padding: 7px 12px; border-radius: var(--r-s); color: var(--ink-2); font-weight: 550; font-size: 14px; }
 .site-nav nav a:hover { background: var(--sunk); color: var(--ink); text-decoration: none; }
 .wrap { width: var(--wrap); margin: 0 auto; }
@@ -481,7 +485,10 @@ pre.snippet { margin: 0; padding: 12px 14px; border-radius: var(--r-s); backgrou
   .stat:nth-child(odd) { border-left: 0; }
   .stat:nth-child(n + 3) { border-top: 1px solid var(--line); }
   .plans-grid { grid-template-columns: minmax(0, 1fr); }
-  .site-nav nav { display: none; }
+  .site-nav > div:not(.scroll-bar) { flex-wrap: wrap; column-gap: 8px; row-gap: 0; padding-top: 8px; }
+  .site-nav nav { order: 1; flex: 0 0 100%; flex-wrap: wrap; }
+  .site-nav nav a { padding-inline: 8px; }
+  .site main[id], .site section[id] { scroll-margin-top: 132px; }
   .hero { padding: 40px 0 64px; gap: 44px; }
   .site-section { padding-top: 72px; }
   .steps { grid-template-columns: minmax(0, 1fr); }
@@ -521,6 +528,7 @@ pre.snippet { margin: 0; padding: 12px 14px; border-radius: var(--r-s); backgrou
   .destination { max-width: 55vw; }
   .hero-copy .row-actions .button { flex: 1 1 100%; }
   .site-nav .button:not(.primary) { display: none; }
+  .site-nav .site-mobile-signin { display: inline-block; }
   .demo-stage { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
   .demo-qr { width: 168px; }
   .demo-float { display: none; }

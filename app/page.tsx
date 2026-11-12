@@ -32,12 +32,21 @@ const limitLine = (value: number | null, word: string) => `${value === null ? "U
 
 export default async function Home() {
   const [site, plans] = await Promise.all([getSite(), getPublicPlans()]);
+  const demoLink = site.show.features ? "#features" : site.show.steps ? "#how-it-works" : null;
+  const structuredData = siteOrigin && JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: BRAND,
+    url: siteOrigin.href,
+  }).replace(/</g, "\\u003c");
   const free = plans.find((plan) => plan.id === "free");
   // The plan in the middle is highlighted, as the usual pick.
   const featured = plans.length > 2 ? plans[Math.floor(plans.length / 2)].id : plans.at(-1)?.id;
   return (
     <SiteMotion>
     <div className="site">
+      {structuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />}
+      <a href="#main-content" className="site-skip button primary">Skip to content</a>
       <header className="site-nav">
         <ScrollBar />
         <div>
@@ -52,6 +61,7 @@ export default async function Home() {
             {site.show.steps && <a href="#how-it-works">How it works</a>}
             {site.show.pricing && <a href="#pricing">Pricing</a>}
             {site.show.faq && <a href="#faq">FAQ</a>}
+            <Link href="/login" className="site-mobile-signin">Sign in</Link>
           </nav>
           <div className="row-actions" style={{ flexWrap: "nowrap" }}>
             <ThemeControl />
@@ -65,7 +75,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="wrap">
+      <main id="main-content" className="wrap" tabIndex={-1}>
         <section className="hero">
           <Reveal className="hero-copy">
             <h1 className="display">
@@ -78,9 +88,11 @@ export default async function Home() {
               <Link href="/register" className="button primary large">
                 {site.ctaLabel} <ArrowRight size={17} />
               </Link>
-              <a href="#features" className="button large">
-                See what it does
-              </a>
+              {demoLink && (
+                <a href={demoLink} className="button large">
+                  See what it does
+                </a>
+              )}
             </div>
             <div className="hero-notes">
               <span>
