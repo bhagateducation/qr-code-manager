@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build --webpack",
+    "build": "prisma generate && prisma migrate deploy && node scripts/build-next.mjs",
     "postinstall": "node scripts/ensure-prisma-executable.mjs",
     "start": "next start",
     "lint": "tsc --noEmit --incremental false",

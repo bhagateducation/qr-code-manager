@@ -19,6 +19,7 @@ export default {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
+  experimental: { cpus: 1 },
   async headers() {
     return [
       { source: "/:path*", headers: security },
