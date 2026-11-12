@@ -168,12 +168,6 @@ export async function GET(request: NextRequest) {
       prisma.folder.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" }, take: 2000, select: { id: true, parentId: true, name: true, kind: true, _count: { select: { qrCodes: { where: { deletedAt: null } } } } } }),
     ]);
     const atHome = user.workspaceId === user.homeWorkspaceId;
-    // The configured owner's existing account becomes the platform owner on installs that have none yet.
-    // New registrations of that address are gated separately (see the auth route).
-    if (atHome && !user.platformAdmin && user.role === "owner" && process.env.OWNER_EMAIL?.toLowerCase() === user.email && !(await prisma.user.count({ where: { platformAdmin: true } }))) {
-      await prisma.user.update({ where: { id: user.id }, data: { platformAdmin: true } });
-      user.platformAdmin = true;
-    }
     // The platform owner's own workspace has no limits at all.
     if (atHome && user.platformAdmin && user.workspace.plan !== "owner")
       user.workspace = await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "owner", paidUntil: null } });
