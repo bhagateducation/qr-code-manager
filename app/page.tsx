@@ -35,11 +35,14 @@ const limitLine = (value: number | null, word: string) => `${value === null ? "U
 export default async function Home() {
   const [site, plans] = await Promise.all([getSite(), getPublicPlans()]);
   const demoLink = site.show.features ? "#features" : site.show.steps ? "#how-it-works" : null;
+  const telephone = process.env.PUBLIC_BUSINESS_PHONE?.trim();
+  const address = process.env.PUBLIC_BUSINESS_ADDRESS?.trim();
   const structuredData = siteOrigin && JSON.stringify({
     "@context": "https://schema.org",
     "@graph": [
       { "@type": "Organization", "@id": new URL("#organization", siteOrigin).href,
-        name: COMPANY, url: COMPANY_URL, email: CONTACT_EMAIL, sameAs: PROFILES },
+        name: COMPANY, url: COMPANY_URL, email: CONTACT_EMAIL, sameAs: PROFILES,
+        ...(telephone && { telephone }), ...(address && { address }) },
       { "@type": "WebSite", name: BRAND, url: siteOrigin.href,
         publisher: { "@id": new URL("#organization", siteOrigin).href } },
       { "@type": "SoftwareApplication", name: BRAND, url: siteOrigin.href,
