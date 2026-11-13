@@ -7,6 +7,7 @@ import { getSiteOrigin } from "@/lib/site-origin";
 import { checkoutConfigured } from "@/lib/payments";
 import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
 import AgentTool from "@/components/AgentTool";
+import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { COMPANY, CONTACT_EMAIL, COMPANY_URL, PROFILES, DESCRIPTION } from "@/lib/public-discovery";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
@@ -62,32 +63,7 @@ export default async function Home() {
     <div className="site">
       <AgentTool />
       {structuredData && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData }} />}
-      <a href="#main-content" className="site-skip button primary">Skip to content</a>
-      <header className="site-nav">
-        <div>
-          <Link href="/" className="brand">
-            <span className="brand-mark">
-              <QrCode size={18} />
-            </span>
-            {BRAND}
-          </Link>
-          <nav aria-label="Main">
-            {site.show.features && <a href="#features">Features</a>}
-            {site.show.steps && <a href="#how-it-works">How it works</a>}
-            {site.show.pricing && <a href="#pricing">Pricing</a>}
-            {site.show.faq && <a href="#faq">FAQ</a>}
-            <Link href="/login" className="site-mobile-signin">Sign in</Link>
-          </nav>
-          <div className="row-actions" style={{ flexWrap: "nowrap" }}>
-            <Link href="/login" className="button">
-              Sign in
-            </Link>
-            <Link href="/register" className="button primary">
-              Start free
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader show={site.show} home />
 
       <main id="main-content" className="wrap" tabIndex={-1}>
         <section className="hero">
@@ -337,18 +313,7 @@ export default async function Home() {
           </Link>
         </div>
 
-        <footer className="site-footer">
-          <span>
-            © {new Date().getFullYear()} {BRAND}
-          </span>
-          <span className="row-actions">
-            <Link href="/about">About</Link>
-            <Link href="/contact">Contact</Link>
-            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
-            <Link href="/login">Sign in</Link>
-            <Link href="/register">Create account</Link>
-          </span>
-        </footer>
+        <SiteFooter />
       </main>
     </div>
   );
