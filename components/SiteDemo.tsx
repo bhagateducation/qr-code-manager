@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { Art } from "./Art";
 import Link from "next/link";
 import { ArrowRight, Download, Lock, QrCode, X } from "lucide-react";
 import { buildVCardPayload, buildWifiPayload } from "@/lib/qr-payload";
@@ -196,8 +197,8 @@ export function TypeGrid() {
       <div className="type-grid">
         {QR_TYPES.map((type) => (
           <button type="button" className="type-card" key={type.id} onClick={() => setOpen(type)}>
-            <span className="page-icon" style={{ "--tone": type.tone } as React.CSSProperties}>
-              <type.icon size={18} />
+            <span className="page-icon art" style={{ "--tone": type.tone } as React.CSSProperties}>
+              <Art id={type.id} size={26} />
             </span>
             <h3>{type.name}</h3>
             <p>{type.text}</p>

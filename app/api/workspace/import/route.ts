@@ -6,6 +6,7 @@ import { parseImport } from "@/lib/office";
 export async function POST(request: NextRequest) {
   try {
     if (request.headers.get("origin") !== new URL(process.env.APP_URL!).origin) throw new ApiError(403, "Request origin is not allowed.");
+    if (Number(request.headers.get("content-length") || 0) > 10.5 * 1024 * 1024) throw new ApiError(413, "The file is larger than 10 MB.");
     const user = await authorize(true);
     await rateLimit(`import:${user.id}`, 20, 60);
     const upload = (await request.formData()).get("file");

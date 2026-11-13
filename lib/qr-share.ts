@@ -6,7 +6,7 @@ import { account, linkBase } from "./plans";
 export async function sharedCode(code: string) {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(code)) return null;
   const qr = await prisma.qRCode.findUnique({ where: { shortCode: code }, include: { workspace: true, folder: { select: { name: true } } } });
-  if (!qr || qr.deletedAt) return null;
+  if (!qr || qr.deletedAt || qr.workspace.suspended) return null;
   const base = linkBase((await account(prisma, qr.workspace)).root);
   return { qr, payload: qr.type === "dynamic_url" ? `${base}/s/${qr.shortCode}` : qr.targetUrl };
 }

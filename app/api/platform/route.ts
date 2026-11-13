@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
       await saveSetting("security", z.object({ loginOtp: z.enum(["off", "owners", "all"]) }).parse(input.data));
     } else if (input.action === "notification.send") {
       const data = z
-        .object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(2000), link: z.string().trim().max(190).optional(), kind: z.enum(["update", "feature", "billing", "alert"]), audience: z.string().max(100), email: z.boolean().optional() })
+        .object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(2000), link: z.string().trim().max(190).regex(/^(https?:\/\/[^\s]+|#[a-zA-Z]+)$/, "Use a web link (https://…) or a panel page such as #billing.").optional().or(z.literal("")), kind: z.enum(["update", "feature", "billing", "alert"]), audience: z.string().max(100), email: z.boolean().optional() })
         .parse(input.data);
       const target = data.audience === "all" ? null : (await prisma.workspace.findFirst({ where: { id: data.audience, parentId: null }, select: { id: true } }))?.id;
       if (target === undefined) throw new ApiError(404, "Client not found.");
