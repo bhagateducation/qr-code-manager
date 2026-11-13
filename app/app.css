@@ -1099,10 +1099,3 @@ details > summary + * { animation: slide-down 0.16s ease-out; }
 .side .nav-item[aria-current="page"] { color: var(--ink); font-weight: 650; }
 .side .nav-item[aria-current="page"] .nav-ico { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 30%, transparent); }
 html[data-mode="dark"] .side .nav-pill { background: color-mix(in srgb, var(--tone, var(--brand)) 20%, var(--bg)); }
-
-
-/* Colour icons carry their own colour, so their tiles drop the tint and the 3D edge. */
-:is(.nav-ico, .page-icon).art { background: transparent !important; box-shadow: none !important; border: 0; }
-.art-icon { display: block; flex: none; user-select: none; }
-.page-icon.art { background: color-mix(in srgb, var(--tone) 8%, var(--bg)) !important; }
-.tab .art-icon { margin: 0 auto 2px; }

@@ -42,7 +42,6 @@ import {
 } from "lucide-react";
 import { QR_TYPES, type QrTool } from "@/lib/qr-types";
 import { BRAND } from "@/lib/brand";
-import { Art, hasArt } from "./Art";
 import { api, Ctx, Data, Filters, Info, Modal, QR, ThemeControl, formatDate, formatDateTime, noFilters, viewMotion } from "./ui";
 import Overview from "./Overview";
 import QRCodes from "./QRCodes";
@@ -411,8 +410,8 @@ export default function Dashboard() {
                     QR_TYPES.filter((item, index) => open || index < 5 || tool?.id === item.id).map((item) => (
                       <button className="nav-item nav-sub" key={item.id} title={item.name} style={toneStyle(item.tone)} aria-current={tool?.id === item.id && holdsCurrent ? "page" : undefined} onClick={() => openTool(item)}>
                         {tool?.id === item.id && holdsCurrent && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: "spring", stiffness: 520, damping: 40 }} />}
-                        <span className="nav-ico art" style={toneStyle(item.tone)}>
-                          {hasArt(item.id) ? <Art id={item.id} size={18} /> : <item.icon size={18} />}
+                        <span className="nav-ico" style={toneStyle(item.tone)}>
+                          <item.icon size={15} />
                         </span>
                         <span className="grow truncate">{item.name.replace(/ QR Codes?$| to QR Code$/, "")}</span>
                       </button>
@@ -421,8 +420,8 @@ export default function Dashboard() {
                     members.map((item) => (
                       <button className={`nav-item ${group ? "nav-sub" : ""}`} key={item.id} title={item.label} style={toneStyle(item.tone)} aria-current={view === item.id && !(item.id === "codes" && editing === null && tool) ? "page" : undefined} onClick={() => (setTool(undefined), go(item.id))}>
                         {view === item.id && !(item.id === "codes" && editing === null && tool) && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: "spring", stiffness: 520, damping: 40 }} />}
-                        <span className="nav-ico art" style={toneStyle(item.tone)}>
-                          {hasArt(item.id) ? <Art id={item.id} size={18} /> : <item.icon size={18} />}
+                        <span className="nav-ico" style={toneStyle(item.tone)}>
+                          <item.icon size={15} />
                         </span>
                         <span className="grow truncate">{item.label}</span>
                         {item.id === "codes" && <span className="nav-count">{data.codeCount.toLocaleString()}</span>}
@@ -585,8 +584,8 @@ export default function Dashboard() {
                 {view !== "overview" && editing === undefined && (
                   <div className="page-head">
                     <div className="page-title">
-                      <span className="page-icon art" style={toneStyle(current.tone)}>
-                        {hasArt(current.id) ? <Art id={current.id} size={26} /> : <current.icon size={20} />}
+                      <span className="page-icon" style={toneStyle(current.tone)}>
+                        <current.icon size={20} />
                       </span>
                       <div>
                         <h1>
@@ -632,7 +631,7 @@ export default function Dashboard() {
         <nav className="tabbar" aria-label="Quick navigation">
           {[items[0], items[1]].map((item) => (
             <button key={item.id} className="tab" aria-current={view === item.id ? "page" : undefined} onClick={() => go(item.id)}>
-              {hasArt(item.id) ? <Art id={item.id} size={22} /> : <item.icon size={22} />}
+              <item.icon size={20} />
               {item.label}
             </button>
           ))}
@@ -701,8 +700,8 @@ export default function Dashboard() {
               <div className="choose-grid">
                 {QR_TYPES.map((item) => (
                   <button key={item.id} className="choose-item" onClick={() => (setChooser(false), openTool(item))}>
-                    <span className="nav-ico art" style={toneStyle(item.tone)}>
-                      {hasArt(item.id) ? <Art id={item.id} size={20} /> : <item.icon size={20} />}
+                    <span className="nav-ico" style={toneStyle(item.tone)}>
+                      <item.icon size={16} />
                     </span>
                     {item.name.replace(/ QR Codes?$| to QR Code$/, "")}
                   </button>
