@@ -740,7 +740,7 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 .side-resize:hover, .side-resize:active { background: color-mix(in srgb, var(--brand) 35%, transparent); }
 @media (min-width: 961px) {
   .app.mini { grid-template-columns: 64px minmax(0, 1fr); }
-  .app.mini .side { width: 64px; z-index: 75; overflow-x: hidden; transition: width 0.2s var(--ease), box-shadow 0.2s; }
+  .app.mini .side { width: 64px; z-index: 75; overflow-x: hidden; transition: width 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .app.mini .side:is(:hover, :has(:focus-visible)) { width: var(--side-w); box-shadow: var(--shadow-3); }
   .app.mini .side:not(:hover, :has(:focus-visible)) :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-plan, .panel-switch, .side-user .grow, .side-user > svg, .side-toggle) { display: none; }
   .app.mini .side:not(:hover, :has(:focus-visible)) .nav-group { height: 1px; min-height: 0; width: auto; padding: 0; margin: 8px 6px; overflow: hidden; color: transparent; background: var(--line); }
@@ -768,7 +768,7 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 }
 /* The page makes room for the menu: it narrows while the menu is open and widens again when it folds back to icons. */
 @media (min-width: 961px) {
-  .app { transition: grid-template-columns 0.2s var(--ease); }
+  .app { transition: grid-template-columns 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .app.mini:has(> .side:is(:hover, :has(:focus-visible))) { grid-template-columns: var(--side-w) minmax(0, 1fr); }
   .app.mini .side:is(:hover, :has(:focus-visible)) { box-shadow: none; }
 }
@@ -1054,4 +1054,10 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
 @media (max-width: 640px) {
   .site table.compare th, .site table.compare td { padding: 10px 12px; }
   .site table.compare tbody th { width: 200px; }
+}
+
+/* The panel uses the whole width beside the menu, so folding the menu really gives the page more room. */
+@media (min-width: 961px) {
+  .app .content { max-width: none; }
+  .app .side { will-change: width; }
 }
