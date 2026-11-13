@@ -1,6 +1,6 @@
 # Product
 
-**QR Manager** is a multi-tenant SaaS for businesses that print QR codes on real things: menus, packaging, labels, tickets, business cards.
+**QR Code Generator** is a multi-tenant SaaS for businesses that print QR codes on real things: menus, packaging, labels, tickets, business cards.
 
 ## Who uses it
 - **Workspace owner / staff** of a small or mid-size business. They create codes, print them, and later need to change where a code leads, find one code among thousands, and see whether it is being scanned. Often on a phone, between other tasks.

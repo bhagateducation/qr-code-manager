@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { PrintSheet } from "./Books";
 import { BulkCodes, FileImport, FolderSettings, YouTubeImport } from "./Bulk";
-import { Ctx, Empty, Filters, Info, Menu, QR, copyImage, downloadBlob, folderPath, folderTrail, formatDate, isWaiting, noFilters, qrNumber, qrPng, shareLink, useLabelPref, youtubeId } from "./ui";
+import { Ctx, Empty, Filters, Info, Menu, Modal, QR, copyImage, downloadBlob, folderPath, folderTrail, formatDate, isWaiting, noFilters, qrNumber, qrPng, shareLink, useLabelPref, youtubeId } from "./ui";
 
 const typeLabel: Record<string, string> = { dynamic_url: "Website link", wifi: "Wi-Fi", vcard: "Contact card", text: "Plain text" };
 const TRASH_DAYS = 30;
@@ -33,6 +33,9 @@ export default function QRCodes({
   const [naming, setNaming] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
   const [tool, setTool] = useState<Tool>(null);
+  const [quick, setQuick] = useState<QR | null>(null);
+  // Writers get the quick popup; viewers can only look, so they go straight to the full page.
+  const edit = (qr: QR) => (canWrite ? setQuick(qr) : openStudio(qr));
   const [dragging, setDragging] = useState<{ kind: "qr" | "folder"; id: string } | null>(null);
   const inTrash = filters.status === "trash";
   const set = (patch: Partial<Filters>) => {
@@ -390,7 +393,7 @@ export default function QRCodes({
                       </td>
                     )}
                     <td>
-                      <button className="row-title" disabled={inTrash} style={{ opacity: 1, cursor: inTrash ? "default" : "pointer" }} onClick={() => openStudio(qr)}>
+                      <button className="row-title" disabled={inTrash} style={{ opacity: 1, cursor: inTrash ? "default" : "pointer" }} onClick={() => edit(qr)}>
                         <span className="qr-tile" style={video ? { color: "#d93025" } : undefined}>
                           {video ? <ListVideo size={17} /> : <QrCode size={17} />}
                         </span>
@@ -461,7 +464,7 @@ export default function QRCodes({
                             <button className="icon-button" title="Download high-quality PNG (2048 px)" aria-label={`Download ${qr.title} as PNG`} onClick={() => download(qr)}>
                               <Download size={16} />
                             </button>
-                            <button className="icon-button" title={canWrite ? "Edit" : "View"} aria-label={`Open ${qr.title}`} onClick={() => openStudio(qr)}>
+                            <button className="icon-button" title={canWrite ? "Edit" : "View"} aria-label={`Open ${qr.title}`} onClick={() => edit(qr)}>
                               <Pencil size={16} />
                             </button>
                             {canWrite && (
@@ -546,11 +549,79 @@ export default function QRCodes({
         </div>
       </div>
 
+      {quick && <QuickEdit key={quick.id} ctx={ctx} qr={quick} onClose={() => setQuick(null)} onFull={() => (setQuick(null), openStudio(quick))} />}
       {printing && folder && <PrintSheet folderId={folder.id} onClose={() => setPrinting(false)} notify={notify} label={withLabel} />}
       {tool === "bulk" && <BulkCodes ctx={ctx} folderId={folder?.id || ""} onClose={() => setTool(null)} />}
       {tool === "youtube" && <YouTubeImport ctx={ctx} folderId={folder?.id || ""} onClose={() => setTool(null)} />}
       {tool === "import" && <FileImport ctx={ctx} folderId={folder?.id || ""} onClose={() => setTool(null)} />}
       {tool === "settings" && folder && <FolderSettings ctx={ctx} folder={folder} onClose={() => setTool(null)} onDeleted={() => (setTool(null), set({ folder: folder.parentId || "" }))} />}
     </div>
+  );
+}
+
+/** Quick edit: the everyday changes (name, link, on/off) in a popup, without leaving the list. */
+function QuickEdit({ ctx, qr, onClose, onFull }: { ctx: Ctx; qr: QR; onClose: () => void; onFull: () => void }) {
+  const dynamic = (qr.type || "dynamic_url") === "dynamic_url";
+  const [title, setTitle] = useState(qr.title),
+    [target, setTarget] = useState(qr.targetUrl),
+    [active, setActive] = useState(qr.isActive),
+    [busy, setBusy] = useState(false);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      // Everything not shown here is sent back unchanged, so a quick edit never drops a setting.
+      await ctx.mutate(
+        "qr.update",
+        {
+          title,
+          type: qr.type || "dynamic_url",
+          targetUrl: dynamic ? target : qr.targetUrl,
+          isActive: active,
+          styling: qr.styling,
+          recordId: qr.recordId || null,
+          campaignId: qr.campaignId || null,
+          folderId: qr.folderId || null,
+          tagIds: qr.tags?.map((item) => item.tag.id) || [],
+          routingRules: dynamic ? qr.routingRules || {} : {},
+        },
+        qr.id,
+      );
+      onClose();
+    } catch {
+      // mutate already showed the reason
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal title={`Quick edit ${qrNumber(qr.number)}`} onClose={onClose}>
+      <form className="stack" onSubmit={submit}>
+        <label>
+          Name
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={100} />
+        </label>
+        {dynamic ? (
+          <label>
+            Destination link
+            <input type="url" value={target} onChange={(e) => setTarget(e.target.value)} required maxLength={2048} />
+            <small>The printed code stays the same. Only where it leads changes.</small>
+          </label>
+        ) : (
+          <p className="notice info">This code stores its content inside the image. Open all options to change it.</p>
+        )}
+        <label className="checkbox-row">
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active (works when scanned)
+        </label>
+        <div className="modal-actions">
+          <button type="button" className="button" onClick={onFull}>
+            All options
+          </button>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

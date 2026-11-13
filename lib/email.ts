@@ -8,7 +8,7 @@ type Mailer = { from: string; send: (to: string, subject: string, text: string) 
 /** How mail goes out: Resend from the server environment, else what the platform owner saved under Configuration. */
 async function mailer(override?: EmailSettings): Promise<Mailer | null> {
   if (!override && process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL) return resend(process.env.RESEND_API_KEY, process.env.RESEND_FROM_EMAIL, "env");
-  const saved = override || (await setting<EmailSettings>("email"));
+  const saved = override || (await setting<EmailSettings>("email").catch(() => undefined));
   if (!saved?.from) return null;
   if (saved.provider === "resend") return saved.resendKey ? resend(override ? saved.resendKey : openSecret(saved.resendKey), saved.from, "panel") : null;
   if (!saved.host || !saved.user || !saved.pass) return null;

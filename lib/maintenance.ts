@@ -3,18 +3,36 @@ import { resolveTxt } from "node:dns/promises";
 import { prisma } from "./prisma";
 import { sendEmail } from "./email";
 import { BRAND } from "./brand";
+import { requestPublicUrl } from "./public-request";
 
 const DAY = 86400000;
 
 /** A domain is ready when it carries our TXT token and serves this app over HTTPS. */
 export async function probeDomain(domain: string, token?: string | null) {
   const txt = token ? (await resolveTxt(`_qrm.${domain}`).catch(() => [] as string[][])).flat().includes(token) : true;
-  let live = false;
+  if (!txt) return { txt, live: false };
+
   try {
-    const response = await fetch(`https://${domain}/api/health`, { redirect: "error", cache: "no-store", signal: AbortSignal.timeout(6000) });
-    live = response.ok && (await response.json()).service === "qr-manager";
-  } catch {}
-  return { txt, live };
+    const response = await requestPublicUrl(`https://${domain}/api/health`, { timeout: 6000 });
+    try {
+      const status = response.statusCode ?? 0;
+      if (status < 200 || status >= 300) return { txt, live: false };
+
+      const chunks: Buffer[] = [];
+      let length = 0;
+      for await (const chunk of response) {
+        length += chunk.length;
+        if (length > 4096) return { txt, live: false };
+        chunks.push(chunk);
+      }
+      const result = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      return { txt, live: result?.service === "qr-manager" };
+    } finally {
+      response.destroy();
+    }
+  } catch {
+    return { txt, live: false };
+  }
 }
 
 /**

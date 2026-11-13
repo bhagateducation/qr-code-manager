@@ -1,70 +1,50 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, MotionConfig, motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
-import { ArrowRight, Contact, Link2, QrCode, Wifi } from "lucide-react";
+import { ArrowRight, Download, Lock, QrCode, X } from "lucide-react";
+import { buildVCardPayload, buildWifiPayload } from "@/lib/qr-payload";
+import { QR_TYPES } from "@/lib/qr-types";
 
-const ease = [0.22, 1, 0.36, 1] as const;
-
-/** Honours the visitor's reduced-motion setting for every animation on the page. */
-export function SiteMotion({ children }: { children: React.ReactNode }) {
-  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
+// Every type that makes a single code. Book sets and CSV imports need an account.
+const kinds = QR_TYPES.filter((item) => item.base !== "books" && item.base !== "csv");
+const SAMPLE = "https://example.com";
+const fieldsOf = (kind: (typeof kinds)[number]) =>
+  kind.base === "wifi"
+    ? [{ key: "ssid", label: "Wi-Fi name", placeholder: "Cafe Guest" }, { key: "password", label: "Wi-Fi password", placeholder: "Leave empty if open" }]
+    : kind.base === "vcard"
+      ? [{ key: "name", label: "Full name", placeholder: "Asha Verma" }, { key: "phone", label: "Phone", placeholder: "+91 98765 43210" }, { key: "email", label: "Email", placeholder: "asha@example.com" }]
+      : kind.base === "text"
+        ? [{ key: "text", label: "Your text", placeholder: "Type a short message" }]
+        : kind.fields || [{ key: "url", label: kind.urlLabel || "Website address", placeholder: kind.placeholder || "yourshop.com/menu" }];
+function payloadOf(kind: (typeof kinds)[number], v: Record<string, string>) {
+  const get = (key: string) => (v[key] || "").trim();
+  if (kind.base === "wifi") return get("ssid") ? buildWifiPayload({ ssid: get("ssid"), password: get("password"), security: get("password") ? "WPA" : "nopass", hidden: false }) : "";
+  if (kind.base === "vcard") return get("name") ? buildVCardPayload({ name: get("name"), organization: "", phone: get("phone"), email: get("email"), url: "" }) : "";
+  if (kind.base === "text") return get("text");
+  if (kind.build) return kind.build(v);
+  return get("url") ? (/^https?:\/\//i.test(get("url")) ? get("url") : `https://${get("url")}`) : "";
 }
 
-/** Thin bar under the header that fills as the page is read. */
-export function ScrollBar() {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, { stiffness: 140, damping: 26 });
-  return <motion.div className="scroll-bar" style={{ scaleX }} aria-hidden />;
-}
-
-/** A block that rises in when scrolled to and leans a few degrees toward the mouse. */
-export function Tile({ className, style, delay = 0, children }: { className?: string; style?: React.CSSProperties; delay?: number; children: React.ReactNode }) {
-  const still = useReducedMotion();
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [5, -5]), { stiffness: 220, damping: 22 });
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-5, 5]), { stiffness: 220, damping: 22 });
-  return (
-    <motion.div
-      className={className}
-      style={{ ...style, rotateX, rotateY, transformPerspective: 1000 }}
-      initial={{ opacity: 0, y: 32 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.6, delay, ease }}
-      onPointerMove={(event) => {
-        if (still || event.pointerType !== "mouse") return;
-        const box = event.currentTarget.getBoundingClientRect();
-        x.set((event.clientX - box.left) / box.width - 0.5);
-        y.set((event.clientY - box.top) / box.height - 0.5);
-      }}
-      onPointerLeave={() => (x.set(0), y.set(0))}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-const kinds = [
-  { id: "link", label: "Link", icon: Link2, tone: "var(--c-blue)", field: "Website address", start: "yourshop.com/menu", note: "In your workspace this becomes a dynamic code: change where it leads later without reprinting." },
-  { id: "wifi", label: "Wi-Fi", icon: Wifi, tone: "var(--c-teal)", field: "Network name", start: "Cafe Guest", note: "Guests scan and join. No more spelling out the password." },
-  { id: "card", label: "Contact", icon: Contact, tone: "var(--c-pink)", field: "Full name", start: "Asha Verma", note: "One scan saves your name, phone and email to their phone." },
-] as const;
-const payload = (kind: string, value: string) =>
-  kind === "wifi" ? `WIFI:T:WPA;S:${value};P:welcome123;H:false;;` : kind === "card" ? `BEGIN:VCARD\nVERSION:3.0\nFN:${value}\nEND:VCARD` : /^https?:\/\//.test(value) ? value : `https://${value}`;
-
-/** A real generator on the home page: what you type is the code you see. */
-export function LiveDemo() {
-  const [kind, setKind] = useState<(typeof kinds)[number]>(kinds[0]);
-  const [value, setValue] = useState<string>(kinds[0].start);
+/** A real generator on the home page: what you type is the code you see, and one code can be downloaded free. */
+export function LiveDemo({ initial, embedded }: { initial?: string; embedded?: boolean } = {}) {
+  const [kind, setKind] = useState(kinds.find((item) => item.id === initial) || kinds[0]);
+  const [values, setValues] = useState<Record<string, string>>({});
   const [path, setPath] = useState({ d: "", size: 29 });
+  const [state, setState] = useState<{ kind: "idle" | "busy" | "done" | "used" | "error"; text?: string }>({ kind: "idle" });
+  const payload = payloadOf(kind, values);
+  // Once the free code is used, the real code is not drawn at all: a blurred sample stands in until sign-in.
+  const locked = state.kind === "used";
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("qr-free-used")) setState({ kind: "used" });
+    } catch {}
+  }, []);
   useEffect(() => {
     let active = true;
     import("qrcode").then(({ default: QRCode }) => {
       if (!active) return;
       try {
-        const { modules } = QRCode.create(payload(kind.id, value.trim() || kind.start), { errorCorrectionLevel: "M" });
+        const { modules } = QRCode.create((!locked && payload) || SAMPLE, { errorCorrectionLevel: "M" });
         let d = "";
         for (let y = 0; y < modules.size; y++) for (let x = 0; x < modules.size; x++) if (modules.get(y, x)) d += `M${x} ${y}h1v1h-1z`;
         setPath({ d, size: modules.size });
@@ -75,51 +55,103 @@ export function LiveDemo() {
     return () => {
       active = false;
     };
-  }, [kind, value]);
+  }, [payload, locked]);
+
+  const remember = () => {
+    try {
+      localStorage.setItem("qr-free-used", "1");
+    } catch {}
+  };
+  async function download() {
+    if (!payload) return setState({ kind: "error", text: "Fill in the details first." });
+    setState({ kind: "busy" });
+    try {
+      // The server records the visitor's one free code; only then is the image saved.
+      const response = await fetch("/api/free-qr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: kind.id, content: payload }) });
+      if (!response.ok) {
+        const text = ((await response.json().catch(() => null)) as { error?: string } | null)?.error || "Something went wrong. Please try again.";
+        if (response.status === 409) remember();
+        return setState({ kind: response.status === 409 ? "used" : "error", text });
+      }
+      const { default: QRCode } = await import("qrcode");
+      const link = document.createElement("a");
+      link.href = await QRCode.toDataURL(payload, { width: 1024, margin: 4, errorCorrectionLevel: "M" });
+      link.download = `${kind.id}-qr-code.png`;
+      link.click();
+      remember();
+      setState({ kind: "done" });
+    } catch {
+      setState({ kind: "error", text: "Something went wrong. Please try again." });
+    }
+  }
+
   return (
-    <div className="demo" style={{ "--tone": kind.tone } as React.CSSProperties}>
-      <motion.span className="demo-float a" animate={{ y: [0, -7, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}>
-        <i /> Scan-tested before download
-      </motion.span>
-      <div className="demo-tabs" role="group" aria-label="Code type">
-        {kinds.map((item) => (
-          <button
-            key={item.id}
-            aria-pressed={kind.id === item.id}
-            onClick={() => {
-              setKind(item);
-              setValue(item.start);
-            }}
-          >
-            <item.icon size={15} /> {item.label}
-          </button>
-        ))}
-      </div>
+    <div className={`demo ${embedded ? "embedded" : ""}`} id={embedded ? undefined : "free-qr"} style={{ "--tone": kind.tone } as React.CSSProperties}>
+      <span className="demo-float a">
+        <i /> 1 QR code free, no sign-up
+      </span>
       <label>
-        {kind.field}
-        <input value={value} maxLength={120} onChange={(event) => setValue(event.target.value)} spellCheck={false} autoComplete="off" />
+        QR type
+        <select
+          value={kind.id}
+          onChange={(event) => {
+            setKind(kinds.find((item) => item.id === event.target.value) || kinds[0]);
+            setValues({});
+            setState({ kind: state.kind === "done" || locked ? "used" : "idle" });
+          }}
+        >
+          {kinds.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
       </label>
+      {fieldsOf(kind).map((field) => (
+        <label key={`${kind.id}-${field.key}`}>
+          {field.label}
+          <input value={values[field.key] || ""} placeholder={field.placeholder} maxLength={300} onChange={(event) => setValues({ ...values, [field.key]: event.target.value })} spellCheck={false} autoComplete="off" />
+        </label>
+      ))}
       <div className="demo-stage">
-        <div className="demo-qr">
+        <div className={`demo-qr ${locked ? "locked" : ""}`}>
+          {locked && (
+            <span className="demo-lock">
+              <Lock size={20} />
+            </span>
+          )}
           {path.d ? (
-            <motion.svg key={kind.id} initial={{ opacity: 0, scale: 0.9, rotate: -4 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: 0.4, ease }} viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`QR code for ${value}`} shapeRendering="crispEdges">
+            <svg viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`${kind.name} preview`} shapeRendering="crispEdges">
               <path d={path.d} fill="#15161a" />
-            </motion.svg>
+            </svg>
           ) : (
             <QrCode size={64} color="#c9ccd3" />
           )}
         </div>
         <div className="demo-side">
-          <strong>Try it. This code is real.</strong>
-          <p>{kind.note}</p>
-          <Link href="/register" className="button primary small" style={{ justifySelf: "start" }}>
-            Save and download <ArrowRight size={14} />
-          </Link>
+          <strong>{state.kind === "done" ? "Downloaded." : locked ? (payload ? "Your QR code is ready." : "Make another QR code.") : "Make 1 QR code free."}</strong>
+          <p role="status">
+            {state.kind === "done"
+              ? "This free code cannot be edited later. Create a free account to change links after printing and see scans."
+              : locked
+                ? "You have used your free code. Sign in or create a free account to see and download this one."
+                : state.text || "No account needed. Pick a type, fill it in and download the PNG."}
+          </p>
+          {locked ? (
+            <Link href="/login" className="button primary small" style={{ justifySelf: "start" }}>
+              <Download size={14} /> Sign in to download
+            </Link>
+          ) : state.kind === "done" ? (
+            <Link href="/register" className="button primary small" style={{ justifySelf: "start" }}>
+              Create free account <ArrowRight size={14} />
+            </Link>
+          ) : (
+            <button type="button" className="button primary small" style={{ justifySelf: "start" }} disabled={state.kind === "busy"} onClick={download}>
+              <Download size={14} /> {state.kind === "busy" ? "Preparing…" : "Download free QR"}
+            </button>
+          )}
         </div>
       </div>
-      <motion.span className="demo-float b" animate={{ y: [0, 7, 0] }} transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}>
-        <QrCode size={14} /> QR-00042 · Summer menu
-      </motion.span>
     </div>
   );
 }
@@ -143,14 +175,64 @@ export function SwapDemo() {
       <div className="swap-line">
         <span className="badge">Leads to</span>
         <span className="grow" style={{ overflow: "hidden", minHeight: 20 }}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.code key={index} style={{ display: "block" }} initial={{ y: 14, opacity: 0, filter: "blur(4px)" }} animate={{ y: 0, opacity: 1, filter: "blur(0px)" }} exit={{ y: -14, opacity: 0, filter: "blur(4px)" }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-              {destinations[index]}
-            </motion.code>
-          </AnimatePresence>
+          <code className="swap-destination">{destinations[index]}</code>
         </span>
         <small>edit any time</small>
       </div>
     </div>
+  );
+}
+
+/** The QR type cards. A card opens the free generator for that type in a popup, without leaving the page. */
+export function TypeGrid() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState<(typeof QR_TYPES)[number] | null>(null);
+  useEffect(() => {
+    if (open && !dialog.current?.open) dialog.current?.showModal();
+  }, [open]);
+  const single = open && open.base !== "books" && open.base !== "csv";
+  return (
+    <>
+      <div className="type-grid">
+        {QR_TYPES.map((type) => (
+          <button type="button" className="type-card" key={type.id} onClick={() => setOpen(type)}>
+            <span className="page-icon" style={{ "--tone": type.tone } as React.CSSProperties}>
+              <type.icon size={18} />
+            </span>
+            <h3>{type.name}</h3>
+            <p>{type.text}</p>
+          </button>
+        ))}
+      </div>
+      {/* Native dialog: focus is trapped and Esc closes it without extra code. A click on the backdrop closes it too. */}
+      <dialog ref={dialog} className="type-dialog" aria-label={open?.name} onClose={() => setOpen(null)} onClick={(event) => event.target === dialog.current && dialog.current?.close()}>
+        {open && (
+          <>
+            <div className="type-dialog-head">
+              <h3>{open.name}</h3>
+              <button type="button" className="icon-button" aria-label="Close" onClick={() => dialog.current?.close()}>
+                <X size={18} />
+              </button>
+            </div>
+            {single ? (
+              <LiveDemo key={open.id} initial={open.id} embedded />
+            ) : (
+              <div className="stack">
+                <p>{open.text}</p>
+                <p className="muted">This tool makes many codes at once, so it needs a free account.</p>
+                <div className="row-actions">
+                  <Link href="/register" className="button primary">
+                    Create free account <ArrowRight size={14} />
+                  </Link>
+                  <a href="#pricing" className="button plans-link" onClick={() => dialog.current?.close()}>
+                    See plans
+                  </a>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </dialog>
+    </>
   );
 }

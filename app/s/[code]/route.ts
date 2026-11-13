@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createHmac, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { destination } from "@/lib/validation";
+import { requestPublicUrl } from "@/lib/public-request";
 export const dynamic = "force-dynamic";
 export async function GET(
   request: NextRequest,
@@ -127,19 +128,21 @@ export async function GET(
             const signature = createHmac("sha256", hook.secret).update(payload).digest("hex");
             const delivery = await prisma.webhookDelivery.create({ data: { webhookId: hook.id, eventType: event.type, payload, attempts: 1 } });
             try {
-              const response = await fetch(endpoint.data, {
-                method: "POST",
+              const response = await requestPublicUrl(endpoint.data, {
                 headers: {
                   "Content-Type": "application/json",
+                  "Content-Length": Buffer.byteLength(payload),
                   "User-Agent": "QR-Manager-Webhook/1.0",
                   "X-QR-Manager-Event": event.type,
                   "X-QR-Manager-Signature": `sha256=${signature}`,
                 },
                 body: payload,
-                redirect: "error", // a redirect could point at an internal address
-                signal: AbortSignal.timeout(5000),
+                timeout: 5000,
               });
-              await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: response.ok ? "delivered" : "failed", responseCode: response.status, deliveredAt: response.ok ? new Date() : null, lastError: response.ok ? null : `HTTP ${response.status}` } });
+              const status = response.statusCode ?? 0;
+              response.destroy();
+              const delivered = status >= 200 && status < 300;
+              await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: delivered ? "delivered" : "failed", responseCode: status || null, deliveredAt: delivered ? new Date() : null, lastError: delivered ? null : `HTTP ${status}` } });
             } catch (error) {
               await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: "failed", lastError: error instanceof Error ? error.message.slice(0, 180) : "Delivery failed" } });
             }

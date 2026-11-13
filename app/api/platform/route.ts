@@ -23,7 +23,7 @@ async function owner() {
 export async function GET() {
   try {
     await owner();
-    const [workspaces, owners, live, all, members, folders, systems, activity, plans, payments, lastRun, site] = await Promise.all([
+    const [workspaces, owners, live, all, members, folders, systems, activity, plans, payments, lastRun, site, freeTotal, freeRecent] = await Promise.all([
       prisma.workspace.findMany({ select: { id: true, parentId: true, name: true, plan: true, paidUntil: true, suspended: true, createdAt: true, customLimits: true, notes: true, customDomain: true, domainStatus: true, remindedAt: true } }),
       prisma.user.findMany({ where: { role: "owner" }, select: { workspaceId: true, name: true, email: true, platformAdmin: true } }),
       prisma.qRCode.groupBy({ by: ["workspaceId"], where: { deletedAt: null }, _count: { _all: true } }),
@@ -36,6 +36,8 @@ export async function GET() {
       prisma.payment.findMany({ where: { status: "paid" }, orderBy: { createdAt: "desc" }, take: 300, select: { id: true, workspaceId: true, plan: true, amount: true, method: true, note: true, createdAt: true, paidAt: true } }),
       prisma.siteSetting.findUnique({ where: { key: "maintenance.lastRun" } }),
       getSite(),
+      prisma.freeQrCredit.count(),
+      prisma.freeQrCredit.findMany({ orderBy: { createdAt: "desc" }, take: 50, select: { id: true, type: true, content: true, createdAt: true } }),
     ]);
     // Panels roll up into the client account (root workspace) they belong to.
     const rootOf = new Map(workspaces.map((workspace) => [workspace.id, workspace.parentId || workspace.id]));
@@ -98,6 +100,7 @@ export async function GET() {
       security: { loginOtp: (await setting<{ loginOtp?: string }>("security"))?.loginOtp || "off" },
       notifications: await prisma.notification.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
       gateway: await paymentKeys().then((keys) => ({ source: keys.source, keyId: keys.keyId ? `${keys.keyId.slice(0, 12)}…` : "", live: keys.keyId.startsWith("rzp_live_"), webhook: !!keys.webhookSecret, webhookUrl: `${process.env.APP_URL}/api/billing/webhook` })),
+      freeCredits: { total: freeTotal, recent: freeRecent },
     });
   } catch (error) {
     return failure(error);

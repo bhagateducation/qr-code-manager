@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle2, ClipboardCopy, Contact, Download, Link2, QrCode, Trash2, Type, Wifi } from "lucide-react";
 import FolderPicker from "./FolderPicker";
 import { buildVCardPayload, buildWifiPayload, QRType } from "@/lib/qr-payload";
+import type { QrTool } from "@/lib/qr-types";
 import { CopyButton, Ctx, Info, QR, copyImage, downloadBlob, qrNumber, qrPng, saveFile, useLabelPref } from "./ui";
 
 type Styling = { dark: string; light: string; errorCorrectionLevel: "L" | "M" | "Q" | "H" };
@@ -28,11 +29,12 @@ const toLocalInput = (iso?: string) => {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 
-export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx: Ctx; qr: QR | null; defaultFolder?: string; onClose: () => void }) {
+export default function QRStudio({ ctx, qr, tool, defaultFolder = "", onClose }: { ctx: Ctx; qr: QR | null; tool?: QrTool; defaultFolder?: string; onClose: () => void }) {
   const { data, canWrite, mutate, notify, ask } = ctx;
   const [saved, setSaved] = useState(qr),
     [title, setTitle] = useState(qr?.title || ""),
-    [qrType, setQrType] = useState<QRType>(qr?.type || "dynamic_url"),
+    [qrType, setQrType] = useState<QRType>(qr?.type || (tool && tool.base !== "books" && tool.base !== "csv" ? tool.base : "dynamic_url")),
+    [toolValues, setToolValues] = useState<Record<string, string>>({}),
     [target, setTarget] = useState(qr?.targetUrl || ""),
     [wifi, setWifi] = useState({ ssid: "", password: "", security: "WPA" as "WPA" | "WEP" | "nopass", hidden: false }),
     [card, setCard] = useState({ name: "", organization: "", phone: "", email: "", url: "" }),
@@ -147,8 +149,8 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
         <form className="panel stack" onSubmit={submit}>
           <div className="panel-heading" style={{ marginBottom: 0 }}>
             <div>
-              <h1>{saved ? `Edit ${qrNumber(saved.number)}` : "New QR code"}</h1>
-              <p className="muted">{qrType === "dynamic_url" ? "The printed code never changes. You can update where it leads at any time." : "This content is stored inside the code itself, so reprint it after changes."}</p>
+              <h1>{saved ? `Edit ${qrNumber(saved.number)}` : tool ? tool.name : "New QR code"}</h1>
+              <p className="muted">{tool && !saved ? tool.text : qrType === "dynamic_url" ? "The printed code never changes. You can update where it leads at any time." : "This content is stored inside the code itself, so reprint it after changes."}</p>
             </div>
             {saved && canWrite && (
               <button type="button" className="icon-button danger" aria-label="Move this code to the trash" title="Move to trash" onClick={remove}>
@@ -157,6 +159,8 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
             )}
           </div>
           <fieldset disabled={!canWrite} className="stack" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+            {!(tool && !saved) && (
+            <>
             <span className="field-label">
               QR type
               <Info text="Website link codes are dynamic: the printed code holds a short link that never changes, and you can point it somewhere else at any time. Contact, Wi-Fi and text codes store their content inside the image, so editing them changes the printed code." />
@@ -169,15 +173,34 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
                 </button>
               ))}
             </div>
+            </>
+            )}
             <label>
               Name
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Summer menu" required maxLength={100} />
             </label>
+            {qrType === "dynamic_url" && !saved && tool?.fields?.map((field) => (
+              <label key={field.key}>
+                {field.label}
+                <input
+                  type={field.type || "text"}
+                  value={toolValues[field.key] || ""}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  maxLength={500}
+                  onChange={(e) => {
+                    const next = { ...toolValues, [field.key]: e.target.value };
+                    setToolValues(next);
+                    setTarget(tool.build?.(next) || "");
+                  }}
+                />
+              </label>
+            ))}
             {qrType === "dynamic_url" && (
               <label>
-                Destination URL
+                {(!saved && tool?.urlLabel) || "Destination URL"}
                 <Info text="Where people land after scanning. Change it whenever you like — the QR image stays exactly the same, so printed copies keep working." />
-                <input type="url" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="https://your-website.com/menu" required maxLength={2048} />
+                <input type="url" value={target} onChange={(e) => setTarget(e.target.value)} placeholder={(!saved && tool?.placeholder) || "https://your-website.com/menu"} required maxLength={2048} />
               </label>
             )}
             {qrType === "wifi" && (

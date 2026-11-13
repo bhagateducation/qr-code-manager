@@ -9,10 +9,15 @@ export type PaymentKeys = { keyId: string; keySecret: string; webhookSecret: str
 export async function paymentKeys(): Promise<PaymentKeys> {
   if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)
     return { keyId: process.env.RAZORPAY_KEY_ID, keySecret: process.env.RAZORPAY_KEY_SECRET, webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || "", source: "env" };
-  const saved = await setting<{ keyId?: string; keySecret?: string; webhookSecret?: string }>("razorpay");
+  // A database that is not reachable (e.g. while the site is being built) means checkout is simply off.
+  const saved = await setting<{ keyId?: string; keySecret?: string; webhookSecret?: string }>("razorpay").catch(() => undefined);
   if (saved?.keyId && saved.keySecret)
     return { keyId: saved.keyId, keySecret: openSecret(saved.keySecret), webhookSecret: openSecret(saved.webhookSecret), source: "panel" };
   return { keyId: "", keySecret: "", webhookSecret: "", source: "none" };
+}
+/** Website checkout is on once Razorpay keys exist, from the environment or the panel. */
+export async function checkoutConfigured() {
+  return !!(await paymentKeys()).keySecret;
 }
 export async function razorpay(path: string, data?: unknown, keys?: PaymentKeys) {
   const { keyId: key, keySecret: secret } = keys || (await paymentKeys());

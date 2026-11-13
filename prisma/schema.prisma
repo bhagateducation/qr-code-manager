@@ -428,3 +428,17 @@ model Notification {
   @@index([workspaceId, createdAt])
   @@map("notifications")
 }
+
+// One free QR code made on the website without an account ("Free QR Credits").
+// content is kept for links only; Wi-Fi passwords, contacts and text are never stored.
+model FreeQrCredit {
+  id        String   @id @default(uuid())
+  visitorId String   @unique
+  type      String
+  content   String?  @db.Text
+  ipHash    String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("free_qr_credits")
+}

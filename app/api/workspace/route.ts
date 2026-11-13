@@ -22,7 +22,7 @@ import {
 import { account, linkBase, over, requireFeature, requireStorage, usage } from "@/lib/plans";
 import { probeDomain, runMaintenance } from "@/lib/maintenance";
 import { sendWorkspaceInvitationEmail } from "@/lib/email";
-import { paymentKeys } from "@/lib/payments";
+import { checkoutConfigured } from "@/lib/payments";
 
 const newCode = () => randomBytes(9).toString("base64url");
 // A code made without a link points at its own QR page on this site, so a scan never errors before the link is set.
@@ -215,12 +215,6 @@ export async function GET(request: NextRequest) {
       prisma.folder.findMany({ where: { workspaceId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], take: 2000, select: { id: true, parentId: true, name: true, kind: true, position: true, _count: { select: { qrCodes: { where: { deletedAt: null } } } } } }),
     ]);
     const atHome = user.workspaceId === user.homeWorkspaceId;
-    // The configured owner's existing account becomes the platform owner on installs that have none yet.
-    // New registrations of that address are gated separately (see the auth route).
-    if (atHome && !user.platformAdmin && user.role === "owner" && process.env.OWNER_EMAIL?.toLowerCase() === user.email && !(await prisma.user.count({ where: { platformAdmin: true } }))) {
-      await prisma.user.update({ where: { id: user.id }, data: { platformAdmin: true } });
-      user.platformAdmin = true;
-    }
     // The platform owner's own workspace has no limits at all.
     if (atHome && user.platformAdmin && user.workspace.plan !== "owner")
       user.workspace = await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "owner", paidUntil: null } });
@@ -290,7 +284,7 @@ export async function GET(request: NextRequest) {
       folders,
       pageSize: size,
       limits: acct.limits,
-      checkoutReady: !!(await paymentKeys()).keySecret,
+      checkoutReady: await checkoutConfigured(),
       appUrl: process.env.APP_URL,
       notifications: await prisma.notification
         .findMany({ where: { OR: [{ workspaceId: null }, { workspaceId: acct.root.id }] }, orderBy: { createdAt: "desc" }, take: 30 })
@@ -376,7 +370,7 @@ export async function POST(request: NextRequest) {
           throw new ApiError(404, "One or more tags were not found.");
         if (input.action === "qr.create") {
           const now = await usage(tx, ids);
-          if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached.");
+          if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached. Upgrade your plan under Plan & billing to make more.");
           requireStorage(quota, now.storageBytes, 600);
           // The workspace row is locked by this transaction, so numbers never repeat or skip under load.
           const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
@@ -729,7 +723,7 @@ export async function POST(request: NextRequest) {
         const source = await tx.qRCode.findFirst({ where: { id: input.id, workspaceId, deletedAt: null }, include: { tags: true } });
         if (!source) throw new ApiError(404, "QR not found.");
         const now = await usage(tx, ids);
-        if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached.");
+        if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached. Upgrade your plan under Plan & billing to make more.");
         requireStorage(quota, now.storageBytes, 600);
         const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
         entity = await tx.qRCode.create({

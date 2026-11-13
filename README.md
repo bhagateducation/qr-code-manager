@@ -1,4 +1,4 @@
-# QR Manager
+# QR Code Generator
 
 A multi-tenant QR code SaaS: numbered dynamic QR codes with search, bulk actions and a 30-day trash, custom business records with public pages, scan analytics, teams, API keys, webhooks and Razorpay billing. Built with Next.js (App Router), React, TypeScript, Prisma and MySQL.
 
@@ -21,7 +21,7 @@ npm run dev
 | --- | --- |
 | `npm run lint` | TypeScript |
 | `npm test` | Validation, payment signatures, QR decode for every colour and correction level |
-| `node tests/integration.mjs` | 160 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
+| `node tests/integration.mjs` | 159 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
 
 ## Structure
 

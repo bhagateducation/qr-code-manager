@@ -19,8 +19,14 @@ export default {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
+  experimental: { cpus: 1 },
   async headers() {
-    return [{ source: "/:path*", headers: security }];
+    return [
+      { source: "/:path*", headers: security },
+      { source: "/", headers: [
+        { key: "Link", value: '</llms.txt>; rel="describedby"; type="text/plain", </home.md>; rel="alternate"; type="text/markdown"' },
+      ] },
+    ];
   },
   async redirects() {
     return [
@@ -34,9 +40,9 @@ export default {
         destination: "/dashboard",
         permanent: false,
       })),
-      { source: "/login.html", destination: "/login", permanent: false },
-      { source: "/register.html", destination: "/register", permanent: false },
-      { source: "/index.html", destination: "/", permanent: false },
+      { source: "/login.html", destination: "/login", permanent: true },
+      { source: "/register.html", destination: "/register", permanent: true },
+      { source: "/index.html", destination: "/", permanent: true },
     ];
   },
 };
