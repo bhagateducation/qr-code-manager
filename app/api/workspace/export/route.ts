@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize, failure, ApiError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { account, linkBase } from "@/lib/plans";
+import { officeExport, officeTemplate } from "@/lib/office";
 
 function csvCell(value: unknown) {
   let text = String(value ?? "");
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
         },
       });
     }
+    if (kind === "xlsx" || kind === "docx") return officeExport(kind, user.workspaceId, base, request.nextUrl.searchParams.get("folder"));
+    if (kind === "template-xlsx" || kind === "template-docx") return officeTemplate(kind === "template-xlsx" ? "xlsx" : "docx");
     if (kind === "sheet") {
       const all = await prisma.folder.findMany({ where: { workspaceId: user.workspaceId }, select: { id: true, parentId: true, name: true } });
       const root = all.find((folder) => folder.id === request.nextUrl.searchParams.get("folder"));
@@ -57,8 +60,8 @@ export async function GET(request: NextRequest) {
       for (const id of ids) ids.push(...all.filter((folder) => folder.parentId === id).map((folder) => folder.id));
       const rows = await prisma.qRCode.findMany({
         where: { workspaceId: user.workspaceId, deletedAt: null, folderId: { in: ids } },
-        orderBy: { number: "asc" },
-        take: 1000,
+        orderBy: [{ position: "asc" }, { number: "asc" }],
+        take: 2000,
         select: { number: true, title: true, type: true, shortCode: true, targetUrl: true },
       });
       return NextResponse.json(

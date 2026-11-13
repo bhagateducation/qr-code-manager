@@ -38,6 +38,11 @@ A client's domain only reaches the app once it is connected to this Hostinger we
 
 ## Upgrading an existing database
 
+Version 3.1 adds migration `202611130001_ordering` (manual order for folders and codes, email sign-in codes, notifications). It runs on the next build. Optional: set `YOUTUBE_API_KEY` (YouTube Data API v3) so playlist import reads playlists longer than 100 videos.
+
+`APP_URL` is the domain printed in every QR code when a client has no working custom domain. Set it to the main domain the app runs on (for example `https://qr.armystudy.in`) and keep the old address attached to the site, so codes already printed with it keep working.
+
+
 Migration `202611100001_numbering_trash` adds QR numbers and the trash. It numbers existing codes in creation order with a window function, so it needs MySQL 8 or MariaDB 10.2 or newer. It was applied successfully to the live Hostinger MySQL database on 2026-11-10. On any other existing database, back up before the first build that applies it.
 
 ## Platform owner without a shell
@@ -51,6 +56,9 @@ The intended owner is `rahulbhagat7458@gmail.com`. Set a strong temporary `OWNER
 Deliver the temporary credential through a private user-controlled channel. The user changes it in Settings; this revokes existing sessions. Remove `OWNER_INITIAL_PASSWORD` from the hosting environment afterwards. No owner password has yet been generated or deployed by this implementation.
 
 ## Razorpay acceptance
+
+Keys can be entered by the platform owner under **Configuration** instead of the environment. They are checked against Razorpay before saving and stored encrypted with a key derived from `DATABASE_URL`, so changing the database password means entering the keys again. Environment values, when present, take priority.
+
 
 Configure test keys first, captured-payment behavior and a webhook secret. Subscribe the exact webhook URL to `payment.captured` and `order.paid`. Verify an actual test checkout plus duplicate/delayed webhooks and provider failures. The application obtains amounts from server configuration, stores the order, validates HMAC, fetches the payment from Razorpay, verifies captured status/amount/currency/order, and atomically grants the plan once.
 

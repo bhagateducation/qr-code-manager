@@ -8,6 +8,10 @@ import { effectivePlan, name } from "@/lib/validation";
 import { FEATURE_KEYS, LIMIT_KEYS, storageOf } from "@/lib/plans";
 import { getSite, siteSchema } from "@/lib/site";
 import { runMaintenance } from "@/lib/maintenance";
+import { paymentKeys, razorpay, settle } from "@/lib/payments";
+import { openSecret, saveSetting, sealSecret, setting } from "@/lib/secrets";
+import { emailStatus, sendEmail, sendPaymentReceipt, testEmail, type EmailSettings } from "@/lib/email";
+import { BRAND } from "@/lib/brand";
 
 const DAY = 86400000;
 async function owner() {
@@ -86,6 +90,14 @@ export async function GET() {
       },
       maintenanceRun: lastRun?.value || null,
       site,
+      // Every purchase, paid or not, for the Payments screen.
+      orders: (
+        await prisma.payment.findMany({ orderBy: { createdAt: "desc" }, take: 1000, select: { id: true, workspaceId: true, orderId: true, paymentId: true, status: true, plan: true, amount: true, currency: true, method: true, note: true, createdAt: true, paidAt: true } })
+      ).map((order) => ({ ...order, client: workspaces.find((workspace) => workspace.id === order.workspaceId)?.name || "Deleted client", email: ownerOf.get(order.workspaceId)?.email || "" })),
+      email: { ...(await emailStatus()), saved: await setting<EmailSettings>("email").then((saved) => (saved ? { provider: saved.provider, from: saved.from, host: saved.host || "", port: saved.port || 465, user: saved.user || "", hasSecret: !!(saved.pass || saved.resendKey) } : null)) },
+      security: { loginOtp: (await setting<{ loginOtp?: string }>("security"))?.loginOtp || "off" },
+      notifications: await prisma.notification.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
+      gateway: await paymentKeys().then((keys) => ({ source: keys.source, keyId: keys.keyId ? `${keys.keyId.slice(0, 12)}…` : "", live: keys.keyId.startsWith("rzp_live_"), webhook: !!keys.webhookSecret, webhookUrl: `${process.env.APP_URL}/api/billing/webhook` })),
     });
   } catch (error) {
     return failure(error);
@@ -155,6 +167,11 @@ export async function POST(request: NextRequest) {
           await tx.workspace.update({ where: { id: workspace.id }, data: { plan, paidUntil: new Date(start + data.days * DAY), remindedAt: null } });
         }
       });
+      // The client gets a receipt by email and a notification in their panel.
+      const fresh = await prisma.workspace.findUniqueOrThrow({ where: { id: workspace.id } });
+      await prisma.notification.create({ data: { workspaceId: workspace.id, kind: "billing", title: "Payment received", body: `We received ₹${data.amount.toLocaleString("en-IN")} by ${data.method.toUpperCase()}. Thank you!`, link: "#billing" } });
+      for (const owner of await prisma.user.findMany({ where: { workspaceId: workspace.id, role: "owner" }, select: { email: true } }))
+        await sendPaymentReceipt(owner.email, { plan, amountPaise: Math.round(data.amount * 100), until: data.days ? fresh.paidUntil : null, reference: data.note });
     } else if (input.action === "client.limits") {
       const workspace = await client();
       // Keys left out follow the plan; a null limit means unlimited.
@@ -183,6 +200,96 @@ export async function POST(request: NextRequest) {
       const site = siteSchema.parse(input.data);
       await prisma.siteSetting.upsert({ where: { key: "site" }, create: { key: "site", value: site }, update: { value: site } });
       revalidatePath("/");
+    } else if (input.action === "razorpay.save") {
+      // Saved encrypted; the secrets are never sent back to the browser.
+      const data = z.object({ keyId: z.string().trim().regex(/^rzp_(test|live)_[A-Za-z0-9]{6,40}$/, "The Key ID starts with rzp_test_ or rzp_live_."), keySecret: z.string().trim().min(10).max(100), webhookSecret: z.string().trim().max(100).optional() }).parse(input.data);
+      await razorpay("orders?count=1", undefined, { keyId: data.keyId, keySecret: data.keySecret, webhookSecret: "", source: "panel" }).catch(() => {
+        throw new ApiError(400, "Razorpay refused these keys. Copy the Key ID and Key Secret again from Razorpay Dashboard → Account & Settings → API Keys.");
+      });
+      const value = { keyId: data.keyId, keySecret: sealSecret(data.keySecret), webhookSecret: data.webhookSecret ? sealSecret(data.webhookSecret) : "" };
+      await saveSetting("razorpay", value);
+    } else if (input.action === "email.save" || input.action === "email.test") {
+      const data = z
+        .object({
+          provider: z.enum(["smtp", "resend"]),
+          from: z.string().trim().min(3).max(200),
+          resendKey: z.string().trim().max(200).optional(),
+          host: z.string().trim().max(200).optional(),
+          port: z.number().int().min(1).max(65535).optional(),
+          user: z.string().trim().max(200).optional(),
+          pass: z.string().max(200).optional(),
+          to: z.string().email().optional(),
+        })
+        .parse(input.data);
+      // A blank password or key keeps the one saved before.
+      const saved = await setting<EmailSettings>("email");
+      const plain: EmailSettings = { provider: data.provider, from: data.from, host: data.host, port: data.port, user: data.user, resendKey: data.resendKey || openSecret(saved?.resendKey), pass: data.pass || openSecret(saved?.pass) };
+      if (input.action === "email.test") {
+        await testEmail(plain, data.to || user.email).catch((error) => {
+          throw new ApiError(400, `The test email failed: ${error instanceof Error ? error.message : "unknown error"}`);
+        });
+        result = { ok: true, sentTo: data.to || user.email };
+      } else await saveSetting("email", { ...plain, resendKey: plain.resendKey ? sealSecret(plain.resendKey) : "", pass: plain.pass ? sealSecret(plain.pass) : "" });
+    } else if (input.action === "security.save") {
+      await saveSetting("security", z.object({ loginOtp: z.enum(["off", "owners", "all"]) }).parse(input.data));
+    } else if (input.action === "notification.send") {
+      const data = z
+        .object({ title: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(2000), link: z.string().trim().max(190).optional(), kind: z.enum(["update", "feature", "billing", "alert"]), audience: z.string().max(100), email: z.boolean().optional() })
+        .parse(input.data);
+      const target = data.audience === "all" ? null : (await prisma.workspace.findFirst({ where: { id: data.audience, parentId: null }, select: { id: true } }))?.id;
+      if (target === undefined) throw new ApiError(404, "Client not found.");
+      await prisma.notification.create({ data: { workspaceId: target, title: data.title, body: data.body, link: data.link || null, kind: data.kind } });
+      let emailed = 0;
+      if (data.email) {
+        const owners = await prisma.user.findMany({ where: { role: "owner", platformAdmin: false, ...(target ? { workspaceId: target } : { workspace: { parentId: null } }) }, select: { email: true }, take: 5000 });
+        for (const owner of owners) if (await sendEmail(owner.email, `${BRAND}: ${data.title}`, `${data.body}${data.link ? `
+
+${data.link}` : ""}
+
+Open your panel: ${process.env.APP_URL}/dashboard`)) emailed++;
+      }
+      result = { ok: true, emailed };
+    } else if (input.action === "notification.delete") {
+      await prisma.notification.deleteMany({ where: { id: input.id || "" } });
+    } else if (input.action === "client.email") {
+      // Manual emails to one client: renewal reminder, plan ended, payment receipt or a custom message.
+      const workspace = await client();
+      const data = z.object({ kind: z.enum(["reminder", "expired", "receipt", "custom"]), subject: z.string().trim().max(150).optional(), text: z.string().trim().max(4000).optional() }).parse(input.data);
+      const owners = await prisma.user.findMany({ where: { workspaceId: workspace.id, role: "owner" }, select: { email: true } });
+      const date = workspace.paidUntil?.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) || "—";
+      const renew = `${process.env.APP_URL}/dashboard#billing`;
+      const last = await prisma.payment.findFirst({ where: { workspaceId: workspace.id, status: "paid" }, orderBy: { createdAt: "desc" } });
+      if (data.kind === "receipt" && !last) throw new ApiError(409, "This client has no payment to confirm.");
+      if (data.kind === "custom" && (!data.subject || !data.text)) throw new ApiError(400, "Write a subject and a message.");
+      let sent = 0;
+      for (const owner of owners) {
+        const ok =
+          data.kind === "receipt"
+            ? await sendPaymentReceipt(owner.email, { plan: last!.plan, amountPaise: last!.amount, until: workspace.paidUntil, reference: last!.paymentId || last!.note })
+            : await sendEmail(
+                owner.email,
+                data.kind === "custom" ? data.subject! : data.kind === "expired" ? `Your ${BRAND} plan has ended` : `Your ${BRAND} plan ends on ${date}`,
+                data.kind === "custom" ? data.text! : data.kind === "expired" ? `Your plan ended on ${date}. Your QR codes keep working, but new codes are limited to the Free plan until you renew.
+
+Renew here: ${renew}` : `Your plan ends on ${date}. Renew before then to keep your plan limits.
+
+Renew here: ${renew}`,
+              );
+        if (ok) sent++;
+      }
+      if (!sent) throw new ApiError(503, "The email could not be sent. Set up email under Configuration first.");
+      result = { ok: true, sent };
+    } else if (input.action === "razorpay.remove") {
+      await prisma.siteSetting.deleteMany({ where: { key: "razorpay" } });
+    } else if (input.action === "razorpay.test") {
+      await razorpay("orders?count=1");
+    } else if (input.action === "order.check") {
+      // Asks Razorpay again about an unpaid order, for payments whose confirmation never arrived.
+      const order = await prisma.payment.findUnique({ where: { id: input.id || "" } });
+      if (!order || order.method !== "razorpay") throw new ApiError(404, "Order not found.");
+      const paid = ((await razorpay(`orders/${order.orderId}/payments`)).items || []).find((item: { status: string }) => item.status === "captured");
+      if (!paid) throw new ApiError(409, "Razorpay has no captured payment for this order yet.");
+      result = await settle(order.orderId, paid.id);
     } else if (input.action === "maintenance.run") {
       result = { ok: true, ...(await runMaintenance(true)) };
     } else throw new ApiError(400, "Unsupported action.");

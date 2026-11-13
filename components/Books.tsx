@@ -2,6 +2,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, FolderOpen, Plus, Printer, Trash2, X } from "lucide-react";
+import FolderPicker from "./FolderPicker";
 import { api, Ctx, Empty, Info, plural, qrNumber, useLabelPref } from "./ui";
 
 type SheetCode = { number: number; title: string; payload: string; path?: string; size?: number };
@@ -9,6 +10,7 @@ type SheetCode = { number: number; title: string; payload: string; path?: string
 /** Every code of a folder (and its sub-folders) laid out for printing or saving as PDF. */
 export function PrintSheet({ folderId, onClose, notify, label = true }: { folderId: string; onClose: () => void; notify: Ctx["notify"]; label?: boolean }) {
   const [withLabel, setWithLabel] = useState(label);
+  const [size, setSize] = useState(3);
   const [sheet, setSheet] = useState<{ title: string; codes: SheetCode[] } | null>(null);
   useEffect(() => {
     let active = true;
@@ -39,6 +41,16 @@ export function PrintSheet({ folderId, onClose, notify, label = true }: { folder
           <input type="checkbox" checked={withLabel} onChange={(event) => setWithLabel(event.target.checked)} />
           Show name and number
         </label>
+        <label className="toggle-row">
+          QR size
+          <select aria-label="Printed QR size" value={size} onChange={(event) => setSize(Number(event.target.value))} style={{ width: "auto", minHeight: 30, padding: "2px 8px", margin: 0 }}>
+            {[2, 2.5, 3, 4, 5, 7].map((cm) => (
+              <option key={cm} value={cm}>
+                {cm} cm
+              </option>
+            ))}
+          </select>
+        </label>
         <button className="button primary" disabled={!sheet?.codes.length} onClick={() => window.print()}>
           <Printer size={16} /> Print or save as PDF
         </button>
@@ -47,7 +59,7 @@ export function PrintSheet({ folderId, onClose, notify, label = true }: { folder
         </button>
       </div>
       {sheet && !sheet.codes.length && <p className="empty">This folder has no codes yet.</p>}
-      <div className="sheet-grid">
+      <div className="sheet-grid" style={{ "--qr-cm": `${size}cm` } as React.CSSProperties}>
         {sheet?.codes.map((code) => (
           <figure key={code.number}>
             <svg viewBox={`-2 -2 ${code.size! + 4} ${code.size! + 4}`} shapeRendering="crispEdges" role="img" aria-label={code.title}>
@@ -76,6 +88,7 @@ export default function Books({ ctx }: { ctx: Ctx }) {
   const [chapters, setChapters] = useState<Chapter[]>([{ name: "Chapter 1", questions: 10 }]);
   const [fill, setFill] = useState({ chapters: 10, questions: 20 });
   const [busy, setBusy] = useState(false);
+  const [parent, setParent] = useState("");
   const [printing, setPrinting] = useState("");
   const [withLabel] = useLabelPref();
   const total = chapters.reduce((sum, chapter) => sum + (chapter.questions || 0), 0);
@@ -89,7 +102,7 @@ export default function Books({ ctx }: { ctx: Ctx }) {
     const form = new FormData(element);
     setBusy(true);
     try {
-      const result = await mutate("book.create", { title: form.get("title"), urlTemplate: form.get("urlTemplate"), chapters });
+      const result = await mutate("book.create", { title: form.get("title"), urlTemplate: form.get("urlTemplate") || "", parentId: parent || null, chapters });
       element.reset();
       setChapters([{ name: "Chapter 1", questions: 10 }]);
       openFolder(result.entity.id);
@@ -112,12 +125,18 @@ export default function Books({ ctx }: { ctx: Ctx }) {
               <input name="title" required maxLength={100} placeholder="e.g. Army GD Maths" />
             </label>
             <label>
-              Link for each question
-              <Info text="Every question gets its own dynamic QR. Write the link once with {chapter} and {question} in it, e.g. https://your-site.com/maths/{chapter}/{question}; each code fills in its own numbers. You can change any single code's link later." />
-              <input name="urlTemplate" required maxLength={1500} defaultValue="https://your-site.com/book/{chapter}/{question}" />
+              Link for each question (optional)
+              <Info text="Where each question's code opens. Write it once with {chapter} and {question}, e.g. https://example.com/maths/{chapter}/{question}. Leave it empty to add links later (one by one, or by exporting to Excel, filling the Link column and importing back). Until a link is added, a scan opens the code's own page on your domain, never an error." />
+              <input name="urlTemplate" maxLength={1500} placeholder="https://example.com/maths/{chapter}/{question}" />
               <small>
-                <code>{"{chapter}"}</code> and <code>{"{question}"}</code> are replaced with their numbers.
+                Printed codes always use <code>{data.linkBase.replace(/^https?:\/\//, "")}</code>
+                {data.domain?.use ? " (your domain)" : ""}, and keep working when you change links later.
               </small>
+            </label>
+            <label>
+              Put the book in
+              <Info text="Pick a folder to keep this book inside, e.g. a class or subject. Leave it empty to put the book at the top." />
+              <FolderPicker ctx={ctx} value={parent} onChange={setParent} />
             </label>
           </div>
           <div className="inline-form">

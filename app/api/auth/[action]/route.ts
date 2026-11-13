@@ -19,8 +19,11 @@ import {
 } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { verifyTotp } from "@/lib/mfa";
-import { emailDeliveryConfigured, sendEmailVerificationEmail } from "@/lib/email";
-import { createHash } from "node:crypto";
+import { emailDeliveryConfigured, sendEmailVerificationEmail, sendLoginCode, sendWelcome } from "@/lib/email";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
+import { setting } from "@/lib/secrets";
+
+const codeHash = (userId: string, code: string) => createHash("sha256").update(`${userId}:${code}`).digest("hex");
 
 export async function POST(
   request: NextRequest,
@@ -94,6 +97,7 @@ export async function POST(
         user.email,
         `${process.env.APP_URL}/verify-email?token=${encodeURIComponent(verificationToken)}`,
       );
+      await sendWelcome(user.email, user.name);
     } else {
       user = await prisma.user.findUnique({
         where: { email: credentials.email },
@@ -108,7 +112,8 @@ export async function POST(
       );
       if (!user || !valid || user.workspace.suspended)
         throw new ApiError(401, "Invalid email or password.");
-      if (process.env.REQUIRE_EMAIL_VERIFICATION === "true" && emailDeliveryConfigured() && !user.emailVerifiedAt)
+      const mailReady = await emailDeliveryConfigured();
+      if (process.env.REQUIRE_EMAIL_VERIFICATION === "true" && mailReady && !user.emailVerifiedAt)
         throw new ApiError(403, "Verify your email address before signing in.");
       if (user.mfaEnabled) {
         if (!credentials.mfaCode) return json({ mfaRequired: true });
@@ -119,12 +124,33 @@ export async function POST(
           await prisma.user.update({ where: { id: user.id }, data: { backupCodes: backups.filter((item) => item !== code) } });
         else if (!user.mfaSecret || !verifyTotp(user.mfaSecret, code))
           throw new ApiError(401, "Invalid authenticator code.");
+      } else {
+        // Email sign-in code, when the platform owner turned it on. Skipped while email cannot be sent, so nobody is locked out.
+        const rule = (await setting<{ loginOtp?: string }>("security"))?.loginOtp || "off";
+        const needed = rule === "all" || (rule === "owners" && (user.platformAdmin || user.role === "owner"));
+        if (needed && mailReady) {
+          const typed = (credentials.mfaCode || "").replace(/\D/g, "");
+          if (!typed) {
+            await rateLimit(`login-code:${user.id}`, 5, 900);
+            const code = String(randomInt(0, 1000000)).padStart(6, "0");
+            await prisma.user.update({ where: { id: user.id }, data: { loginCodeHash: codeHash(user.id, code), loginCodeExpires: new Date(Date.now() + 10 * 60000), loginCodeTries: 0 } });
+            if (!(await sendLoginCode(user.email, code))) throw new ApiError(503, "The sign-in code could not be emailed. Try again in a minute.");
+            return json({ mfaRequired: true, method: "email", sentTo: user.email.replace(/^(.{2}).*(@.*)$/, "$1•••$2") });
+          }
+          const fresh = user.loginCodeHash && user.loginCodeExpires && user.loginCodeExpires > new Date() && user.loginCodeTries < 5;
+          const match = fresh && timingSafeEqual(Buffer.from(user.loginCodeHash!), Buffer.from(codeHash(user.id, typed)));
+          if (!match) {
+            await prisma.user.update({ where: { id: user.id }, data: { loginCodeTries: { increment: 1 } } });
+            throw new ApiError(401, fresh ? "That code is not right. Check the latest email." : "That code has expired. Sign in again to get a new one.");
+          }
+          await prisma.user.update({ where: { id: user.id }, data: { loginCodeHash: null, loginCodeExpires: null, loginCodeTries: 0 } });
+        }
       }
     }
     const verificationRequired =
       action === "register" &&
       process.env.REQUIRE_EMAIL_VERIFICATION === "true" &&
-      emailDeliveryConfigured();
+      (await emailDeliveryConfigured());
     if (verificationRequired)
       return json({ ok: true, emailVerificationRequired: true });
     const token = await createSession(user.id);

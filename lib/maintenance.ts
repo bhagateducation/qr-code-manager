@@ -51,6 +51,7 @@ export async function runMaintenance(force = false) {
         )
       )
         emailed++;
+    await prisma.notification.create({ data: { workspaceId: workspace.id, kind: "alert", title: ended ? "Your plan has ended" : "Your plan ends soon", body: `${ended ? "Your plan ended" : "Your plan ends"} on ${date}. Renew to keep your plan limits.`, link: "#billing" } });
     await prisma.workspace.update({ where: { id: workspace.id }, data: { remindedAt: new Date() } });
     await prisma.auditLog.create({ data: { workspaceId: workspace.id, actorId: "system", action: "subscription.reminder" } });
   }

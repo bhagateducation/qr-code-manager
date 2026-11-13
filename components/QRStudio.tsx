@@ -108,11 +108,11 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
       setBusy(false);
     }
   }
-  async function download(format: "png" | "svg") {
-    const filename = (title || "qr-code").replace(/[^a-z0-9_-]/gi, "-").slice(0, 80);
+  async function download(format: "png" | "svg", width = 2048) {
+    const filename = `${saved ? `${qrNumber(saved.number)}-` : ""}${(title || "qr-code").replace(/[^a-z0-9_-]/gi, "-").slice(0, 80)}`;
     if (format === "png") {
       try {
-        downloadBlob(await qrPng(payload, style, label), `${filename}.png`);
+        downloadBlob(await qrPng(payload, style, label, width), `${filename}${width > 2048 ? "-print" : ""}.png`);
       } catch (e) {
         notify((e as Error).message, "error");
       }
@@ -340,9 +340,11 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
           )}
           {payload && qrType === "dynamic_url" && (
             <>
-              <code className="qr-link">{payload}</code>
-              <CopyButton value={payload} label="Copy link" notify={notify} />
-              <small>Changing the destination never changes this link or the QR image.</small>
+              <small>
+                Scans go through <code>{payload.replace(/^https?:\/\//, "")}</code>. Changing the destination never changes this QR image.
+              </small>
+              {saved && <CopyButton value={`${data.linkBase}/q/${saved.shortCode}`} label="Copy share link" notify={notify} />}
+              <small>The share link opens a page that shows this QR code with download buttons — handy for sending the code itself.</small>
             </>
           )}
           <label className="toggle-row">
@@ -354,14 +356,17 @@ export default function QRStudio({ ctx, qr, defaultFolder = "", onClose }: { ctx
             <ClipboardCopy size={16} /> Copy QR image
           </button>
           <div className="download-actions">
-            <button className="button primary" disabled={!image} onClick={() => download("png")}>
-              <Download size={16} /> PNG
+            <button className="button primary" disabled={!image} onClick={() => download("png")} title="2048 px, sharp up to about 17 cm">
+              <Download size={16} /> PNG HD
             </button>
-            <button className="button" disabled={!image} onClick={() => download("svg")}>
+            <button className="button" disabled={!image} onClick={() => download("png", 4096)} title="4096 px for posters and banners">
+              <Download size={16} /> PNG print
+            </button>
+            <button className="button" disabled={!image} onClick={() => download("svg")} title="Vector: any size, smallest file">
               <Download size={16} /> SVG
             </button>
           </div>
-          <small>Keep the white margin when printing, and test one print before a large batch.</small>
+          <small>For print, SVG stays sharp at any size and is the smallest file. Print the code at least 2 × 2 cm, keep the white margin, and test one print before a large batch.</small>
         </div>
       </div>
     </>

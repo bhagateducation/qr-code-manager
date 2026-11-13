@@ -24,6 +24,12 @@ export async function GET(
       include: { workspace: { select: { suspended: true } } },
     });
     if (!qr || qr.deletedAt) return message("QR code not found.", 404);
+    // A code that cannot open its link shows its own friendly page instead of an error.
+    const hold = (state: string) => {
+      const response = NextResponse.redirect(new URL(`/q/${qr.shortCode}?state=${state}`, process.env.APP_URL), 302);
+      response.headers.set("Cache-Control", "no-store");
+      return response;
+    };
     const rules = (qr.routingRules || {}) as {
       ios?: string;
       android?: string;
@@ -34,10 +40,7 @@ export async function GET(
       qr.workspace.suspended ||
       (rules.expiresAt && Date.parse(rules.expiresAt) <= Date.now())
     )
-      return message(
-        "This QR code is currently unavailable. Contact its owner.",
-        410,
-      );
+      return hold("paused");
     const ua = (request.headers.get("user-agent") || "").slice(0, 512);
     const os = /iPhone|iPad|iPod/i.test(ua)
       ? "iOS"
@@ -58,18 +61,14 @@ export async function GET(
             (os === "Android" && rules.android) ||
             qr.targetUrl,
         );
-    if (!target.success)
-      return message(
-        "This QR destination needs to be updated by its owner.",
-        410,
-      );
+    if (!target.success) return hold("waiting");
     if (!staticPayload) {
       const parsed = new URL(target.data);
       if (
         parsed.origin === new URL(process.env.APP_URL!).origin &&
         parsed.pathname.startsWith("/s/")
       )
-        return message("Invalid QR destination.", 410);
+        return hold("waiting");
     }
     // Persist both events together before returning; serverless fire-and-forget loses events.
     if (

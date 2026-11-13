@@ -7,6 +7,7 @@ import {
   Activity,
   AlertCircle,
   BarChart3,
+  Bell,
   BookOpen,
   Building2,
   Check,
@@ -23,19 +24,23 @@ import {
   LogOut,
   Menu,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   QrCode,
   RefreshCw,
   Search,
   Settings,
+  SlidersHorizontal,
   Tag,
   UserPlus,
   Users,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
-import { api, Ctx, Data, Filters, Info, Modal, QR, ThemeControl, formatDate, noFilters, viewMotion } from "./ui";
+import { api, Ctx, Data, Filters, Info, Modal, QR, ThemeControl, formatDate, formatDateTime, noFilters, viewMotion } from "./ui";
 import Overview from "./Overview";
 import QRCodes from "./QRCodes";
 import { ApiKeys, Tags, Webhooks } from "./Connect";
@@ -52,6 +57,8 @@ const Books = dynamic(() => import("./Books"), { loading });
 const Clients = dynamic(() => import("./Owner").then((module) => module.Clients), { loading });
 const Plans = dynamic(() => import("./Owner").then((module) => module.Plans), { loading });
 const Website = dynamic(() => import("./Owner").then((module) => module.Website), { loading });
+const Payments = dynamic(() => import("./Owner").then((module) => module.Payments), { loading });
+const Configuration = dynamic(() => import("./Owner").then((module) => module.Configuration), { loading });
 
 // Each module owns one hue, used for its icon everywhere it appears.
 const navigation: { id: string; label: string; icon: LucideIcon; tone: string; group: string; hint: string; help: string; platform?: boolean; account?: boolean }[] = [
@@ -70,8 +77,10 @@ const navigation: { id: string; label: string; icon: LucideIcon; tone: string; g
   { id: "settings", label: "Settings", icon: Settings, tone: "var(--c-slate)", group: "Workspace", hint: "Name, password, two-step sign-in and your domain", help: "Rename the workspace, change your password, protect sign-in with a code from your phone, and connect your own domain." },
   { id: "help", label: "Help", icon: HelpCircle, tone: "var(--c-teal)", group: "Workspace", hint: "Answers and support", help: "Short answers to common questions, and how to reach support." },
   { id: "clients", label: "Clients", icon: Building2, tone: "var(--c-pink)", group: "Platform", hint: "Every customer account, their usage and payments", help: "Only you, the platform owner, see this. Open a client to change their plan, extend it, record a payment, give them custom limits or storage, add notes, open their panel or suspend them.", platform: true },
+  { id: "payments", label: "Payments", icon: Wallet, tone: "var(--c-green)", group: "Platform", hint: "Every purchase from your website, paid or pending", help: "All orders: Razorpay purchases and payments you recorded by hand. Filter by status, check a pending order with Razorpay again, send a receipt, or export the list.", platform: true },
   { id: "plans", label: "Plans", icon: Gem, tone: "var(--c-amber)", group: "Platform", hint: "What each plan costs and allows", help: "Create and edit the plans clients buy: price, length, limits (or unlimited), storage, panels and features. Changes apply at once to every client on the plan.", platform: true },
   { id: "website", label: "Website", icon: Globe, tone: "var(--c-sky)", group: "Platform", hint: "Edit your public home page", help: "Change the headline, text, sections and questions on your home page. Prices on the website come from Plans.", platform: true },
+  { id: "configuration", label: "Configuration", icon: SlidersHorizontal, tone: "var(--c-slate)", group: "Platform", hint: "Payments, email, sign-in security and notifications in one place", help: "Connect Razorpay so clients can buy plans, set up email (Hostinger mail or Resend), turn on an email code at sign-in, and send notifications to every client or one client.", platform: true },
 ];
 type Toast = { id: number; message: string; kind: "ok" | "error" };
 type Confirm = Parameters<Ctx["ask"]>[0] & { resolve: (value: boolean) => void };
@@ -92,8 +101,48 @@ export default function Dashboard() {
     [newMenu, setNewMenu] = useState(false),
     [palette, setPalette] = useState(false),
     [search, setSearch] = useState(""),
-    [cursor, setCursor] = useState(0);
+    [cursor, setCursor] = useState(0),
+    [bell, setBell] = useState(false),
+    [sideMode, setSideMode] = useState<"auto" | "full" | "mini">("auto"),
+    [sideWidth, setSideWidth] = useState(252),
+    [narrow, setNarrow] = useState(false);
   const toastId = useRef(0);
+  // Sidebar: auto shows icons only on mid-size screens; the choice and width are remembered per browser.
+  useEffect(() => {
+    try {
+      const mode = localStorage.getItem("qrm-side");
+      if (mode === "full" || mode === "mini") setSideMode(mode);
+      const width = Number(localStorage.getItem("qrm-side-w"));
+      if (width >= 200 && width <= 360) setSideWidth(width);
+    } catch {}
+    const query = window.matchMedia("(max-width: 1279px)");
+    const sync = () => setNarrow(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  const mini = sideMode === "mini" || (sideMode === "auto" && narrow);
+  const toggleSide = () => {
+    const next = mini ? "full" : "mini";
+    setSideMode(next);
+    try {
+      localStorage.setItem("qrm-side", next);
+    } catch {}
+  };
+  const startResize = (event: React.PointerEvent) => {
+    const start = event.clientX - sideWidth;
+    let width = sideWidth;
+    const move = (e: PointerEvent) => setSideWidth((width = Math.min(360, Math.max(200, e.clientX - start))));
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      try {
+        localStorage.setItem("qrm-side-w", String(width));
+      } catch {}
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
 
   const notify = useCallback<Ctx["notify"]>((message, kind = "ok") => {
     const id = ++toastId.current;
@@ -242,7 +291,7 @@ export default function Dashboard() {
     go,
     openFolder: (id) => {
       setPage(1);
-      setFilters({ ...noFilters, folder: id, sort: "number" });
+      setFilters({ ...noFilters, folder: id, sort: "position" });
       go("codes");
     },
     switchPanel: async (id) => {
@@ -286,7 +335,7 @@ export default function Dashboard() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="app">
+      <div className={`app ${mini ? "mini" : ""}`} style={{ "--side-w": `${sideWidth}px` } as React.CSSProperties}>
         <aside className={`side ${drawer ? "open" : ""}`} aria-label="Workspace navigation">
           <div className="side-head">
             <Link href="/" className="brand-mark" aria-label={`${BRAND} home`}>
@@ -298,6 +347,9 @@ export default function Dashboard() {
             </div>
             <button className="side-close icon-button" aria-label="Close navigation" onClick={() => setDrawer(false)}>
               <X size={18} />
+            </button>
+            <button className="side-toggle icon-button" title={mini ? "Keep the menu open" : "Show icons only (opens when you point at it)"} aria-label={mini ? "Expand the menu" : "Collapse the menu to icons"} onClick={toggleSide}>
+              {mini ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
             </button>
           </div>
           {places.length > 1 && (
@@ -326,7 +378,7 @@ export default function Dashboard() {
             {items.map((item, index) => (
               <div key={item.id}>
                 {item.group && items[index - 1]?.group !== item.group && <div className="nav-group">{item.group}</div>}
-                <button className="nav-item" aria-current={view === item.id ? "page" : undefined} onClick={() => go(item.id)}>
+                <button className="nav-item" title={item.label} aria-current={view === item.id ? "page" : undefined} onClick={() => go(item.id)}>
                   {view === item.id && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: "spring", stiffness: 520, damping: 40 }} />}
                   <span className="nav-ico" style={toneStyle(item.tone)}>
                     <item.icon size={15} />
@@ -365,6 +417,7 @@ export default function Dashboard() {
               <ChevronRight size={15} className="muted" />
             </button>
           </div>
+          {!mini && <div className="side-resize" role="separator" aria-orientation="vertical" aria-label="Drag to resize the menu" onPointerDown={startResize} onDoubleClick={() => setSideWidth(252)} />}
         </aside>
         {drawer && <button className="side-backdrop" aria-label="Close navigation" onClick={() => setDrawer(false)} />}
 
@@ -399,6 +452,59 @@ export default function Dashboard() {
                 </AnimatePresence>
               </div>
             )}
+            <div className="popover-wrap" onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setBell(false)}>
+              <button
+                className="icon-button bell"
+                aria-label={`Notifications${data.notifications.unread ? `, ${data.notifications.unread} new` : ""}`}
+                aria-expanded={bell}
+                onClick={() => {
+                  setBell(!bell);
+                  if (!bell && data.notifications.unread) {
+                    setData({ ...data, notifications: { ...data.notifications, unread: 0 } });
+                    api("/api/notifications", {}).catch(() => {});
+                  }
+                }}
+              >
+                <Bell size={18} />
+                {data.notifications.unread > 0 && <span className="bell-dot">{Math.min(9, data.notifications.unread)}</span>}
+              </button>
+              <AnimatePresence>
+                {bell && (
+                  <motion.div className="popover notices" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.14 }}>
+                    <strong className="notices-head">Notifications</strong>
+                    {data.notifications.items.length ? (
+                      data.notifications.items.map((item) => (
+                        <div key={item.id} className={`notice-item ${item.kind}`}>
+                          <strong>{item.title}</strong>
+                          <p>{item.body}</p>
+                          <small className="muted">
+                            {formatDateTime(item.createdAt)}
+                            {item.link && (
+                              <>
+                                {" · "}
+                                {item.link.startsWith("#") ? (
+                                  <button className="link-button" onClick={() => (setBell(false), go(item.link!.slice(1)))}>
+                                    Open
+                                  </button>
+                                ) : (
+                                  <a href={item.link} target="_blank" rel="noopener noreferrer">
+                                    Open
+                                  </a>
+                                )}
+                              </>
+                            )}
+                          </small>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted" style={{ padding: "8px 4px" }}>
+                        No notifications yet. Updates and alerts appear here.
+                      </p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <ThemeControl />
           </header>
 
@@ -472,6 +578,8 @@ export default function Dashboard() {
                   {view === "clients" && data.user.platformAdmin && <Clients ctx={ctx} />}
                   {view === "plans" && data.user.platformAdmin && <Plans ctx={ctx} />}
                   {view === "website" && data.user.platformAdmin && <Website ctx={ctx} />}
+                  {view === "payments" && data.user.platformAdmin && <Payments ctx={ctx} />}
+                  {view === "configuration" && data.user.platformAdmin && <Configuration ctx={ctx} />}
                 </div>
               </motion.div>
             </AnimatePresence>

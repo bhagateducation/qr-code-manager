@@ -1,9 +1,21 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { ApiError } from "./http";
-export async function razorpay(path: string, data?: unknown) {
-  const key = process.env.RAZORPAY_KEY_ID,
-    secret = process.env.RAZORPAY_KEY_SECRET;
+import { openSecret, setting } from "./secrets";
+import { sendPaymentReceipt } from "./email";
+
+export type PaymentKeys = { keyId: string; keySecret: string; webhookSecret: string; source: "env" | "panel" | "none" };
+/** Razorpay keys: the server environment wins; otherwise the keys the platform owner saved in the panel. */
+export async function paymentKeys(): Promise<PaymentKeys> {
+  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)
+    return { keyId: process.env.RAZORPAY_KEY_ID, keySecret: process.env.RAZORPAY_KEY_SECRET, webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || "", source: "env" };
+  const saved = await setting<{ keyId?: string; keySecret?: string; webhookSecret?: string }>("razorpay");
+  if (saved?.keyId && saved.keySecret)
+    return { keyId: saved.keyId, keySecret: openSecret(saved.keySecret), webhookSecret: openSecret(saved.webhookSecret), source: "panel" };
+  return { keyId: "", keySecret: "", webhookSecret: "", source: "none" };
+}
+export async function razorpay(path: string, data?: unknown, keys?: PaymentKeys) {
+  const { keyId: key, keySecret: secret } = keys || (await paymentKeys());
   if (!key || !secret)
     throw new ApiError(
       503,
@@ -50,7 +62,8 @@ export async function settle(
       409,
       "Payment is not captured or does not match this order.",
     );
-  return prisma.$transaction(async (tx) => {
+  let after: (() => Promise<unknown>) | null = null;
+  const result = await prisma.$transaction(async (tx) => {
     const workspace = await tx.workspace.update({
       where: { id: saved.workspaceId },
       data: { updatedAt: new Date() },
@@ -71,6 +84,11 @@ export async function settle(
       where: { id: saved.workspaceId },
       data: { plan: saved.plan, paidUntil: new Date(start + days * 86400000) },
     });
+    const until = new Date(start + days * 86400000);
+    await tx.notification.create({ data: { workspaceId: saved.workspaceId, kind: "billing", title: "Payment received", body: `Thank you! Your ${saved.plan} plan is active until ${until.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}.`, link: "#billing" } });
+    const owners = await tx.user.findMany({ where: { workspaceId: saved.workspaceId, role: "owner" }, select: { email: true } });
+    // Receipts go out after the transaction commits.
+    after = () => Promise.all(owners.map((owner) => sendPaymentReceipt(owner.email, { plan: saved.plan, amountPaise: saved.amount, until, reference: paymentId })));
     await tx.auditLog.create({
       data: {
         workspaceId: saved.workspaceId,
@@ -81,4 +99,6 @@ export async function settle(
     });
     return { ok: true };
   });
+  await (after as (() => Promise<unknown>) | null)?.().catch(() => {});
+  return result;
 }

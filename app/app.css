@@ -559,7 +559,8 @@ td.pick { width: 40px; padding-right: 0; }
 .chapter-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 96px auto; gap: 8px; align-items: center; }
 .sheet { position: fixed; inset: 0; z-index: 95; overflow-y: auto; background: var(--bg); }
 .sheet-bar { position: sticky; top: 0; display: flex; align-items: center; gap: 10px; padding: 10px 20px; background: var(--bg); border-bottom: 1px solid var(--line); }
-.sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding: 20px; }
+.sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--qr-cm, 3cm) + 22px), 1fr)); gap: 14px; padding: 20px; }
+.sheet-grid svg { display: block; width: var(--qr-cm, 3cm); height: var(--qr-cm, 3cm); margin: 0 auto; }
 .sheet-grid figure { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-s); text-align: center; background: #fff; color: #15161a; break-inside: avoid; }
 .sheet-grid figcaption { display: grid; margin-top: 6px; font-size: 11px; line-height: 1.35; }
 .sheet-grid figcaption b { font-weight: 600; overflow-wrap: anywhere; }
@@ -567,7 +568,7 @@ td.pick { width: 40px; padding-right: 0; }
   body:has(.sheet) > :not(.sheet) { display: none !important; }
   .sheet { position: static; overflow: visible; }
   .sheet-bar { display: none; }
-  .sheet-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0; }
+  .sheet-grid { grid-template-columns: repeat(auto-fill, minmax(calc(var(--qr-cm, 3cm) + 0.6cm), 1fr)); gap: 8px; padding: 0; }
   .sheet-grid figure { border-color: #bbb; }
 }
 @media (max-width: 640px) {
@@ -670,4 +671,80 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
   .limit-grid { grid-template-columns: minmax(0, 1fr); }
   .dns { grid-template-columns: minmax(0, 1fr); }
   .folder-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* v3.1: dropdowns, folder tools, ordering, bell, collapsible sidebar, share page */
+.dropdown { position: relative; }
+.dropdown > summary { list-style: none; cursor: pointer; }
+.dropdown > summary::-webkit-details-marker { display: none; }
+.menu-pop { position: absolute; top: calc(100% + 6px); z-index: 60; display: grid; min-width: 248px; padding: 6px; border-radius: var(--r); background: var(--bg); border: 1px solid var(--line); box-shadow: inset 0 1px 0 var(--edge-hi), var(--shadow-3); }
+.dropdown.right .menu-pop { right: 0; }
+.dropdown.left .menu-pop { left: 0; }
+.menu-pop > a, .menu-pop > button { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: 7px; font-size: 13px; font-weight: 550; color: var(--ink); text-align: left; text-decoration: none; }
+.menu-pop > a:hover, .menu-pop > button:hover { background: var(--sunk); }
+.menu-pop > a svg, .menu-pop > button svg { color: var(--ink-3); flex: none; }
+.menu-label { padding: 8px 10px 2px; font-size: 11px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.toolbar > select { width: auto; min-height: 36px; padding: 4px 8px; font-size: 13px; max-width: 170px; margin: 0; }
+.toolbar .search { flex: 1 1 220px; }
+.folder-tile { position: relative; padding: 0; }
+.folder-open { display: grid; justify-items: center; gap: 2px; width: 100%; padding: 10px 6px 8px; border-radius: var(--r); text-align: center; }
+.folder-tile[draggable="true"] { cursor: grab; }
+.folder-tile.loose svg { color: var(--ink-3); fill: var(--sunk); filter: none; }
+.dragging { opacity: 0.45; }
+.order-cell { display: inline-flex; align-items: center; gap: 4px; }
+.order-cell input { width: 58px; min-height: 30px; padding: 2px 6px; margin: 0; }
+.grip { display: inline-grid; place-items: center; cursor: grab; color: var(--ink-3); padding: 4px 0; }
+.grip:active { cursor: grabbing; }
+.pick-list { display: grid; gap: 4px; max-height: 340px; overflow-y: auto; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-s); }
+.pick-list .toggle-row input:not([type="checkbox"]) { flex: 1; min-height: 32px; padding: 2px 8px; margin: 0; }
+.bell { position: relative; }
+.bell-dot { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.popover.notices { width: min(360px, 92vw); max-height: 70vh; overflow-y: auto; padding: 8px; display: grid; gap: 2px; }
+.notices-head { padding: 4px 6px 8px; font-size: 14px; }
+.notice-item { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; border-left: 3px solid var(--line-strong); }
+.notice-item:hover { background: var(--sunk); }
+.notice-item.feature { border-left-color: var(--brand); }
+.notice-item.alert { border-left-color: var(--danger); }
+.notice-item.billing { border-left-color: var(--c-green); }
+.notice-item p { margin: 0; font-size: 13px; color: var(--ink-2); white-space: pre-line; }
+.link-button { color: var(--brand); font-weight: 600; font-size: inherit; padding: 0; }
+.share-card { justify-items: center; text-align: center; max-width: 420px; }
+.share-qr { width: min(280px, 70vw); aspect-ratio: 1; padding: 10px; background: #fff; border-radius: var(--r); border: 1px solid var(--line); }
+.share-qr svg { display: block; width: 100%; height: 100%; }
+.side-toggle { margin-left: auto; flex: none; }
+.side-resize { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 5; }
+.side-resize:hover, .side-resize:active { background: color-mix(in srgb, var(--brand) 35%, transparent); }
+@media (min-width: 961px) {
+  .app.mini { grid-template-columns: 64px minmax(0, 1fr); }
+  .app.mini .side { width: 64px; z-index: 75; overflow-x: hidden; transition: width 0.2s var(--ease), box-shadow 0.2s; }
+  .app.mini .side:is(:hover, :has(:focus-visible)) { width: var(--side-w); box-shadow: var(--shadow-3); }
+  .app.mini .side:not(:hover, :has(:focus-visible)) :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-plan, .panel-switch, .side-user .grow, .side-user > svg, .side-toggle) { display: none; }
+  .app.mini .side:not(:hover, :has(:focus-visible)) .nav-group { height: 1px; margin: 8px 6px; overflow: hidden; color: transparent; background: var(--line); }
+  .app.mini .side:not(:hover, :has(:focus-visible)) :is(.nav-item, .side-search) { justify-content: center; padding: 0; }
+}
+@media (max-width: 960px) {
+  .side-toggle, .side-resize { display: none; }
+}
+@media (min-width: 961px) {
+  table.cards .row-title { min-width: 260px; }
+  table.cards .destination { max-width: 220px; }
+}
+@media (min-width: 961px) and (max-width: 1399px) {
+  /* Mid-size screens keep the two labelled buttons as icons so titles have room. */
+  table.cards td.actions .button.small .label { display: none; }
+}
+/* Breathing room between the sidebar and the page, and inside the sidebar. */
+@media (min-width: 961px) {
+  .content { padding-left: 36px; padding-right: 36px; }
+  .head { padding-left: 36px; padding-right: 36px; }
+  .side { padding: 14px 12px; }
+  .nav-item { gap: 12px; padding: 0 10px; }
+  .app.mini .content, .app.mini .head { padding-left: 32px; }
+  .app.mini .side { padding: 14px 10px; }
+}
+/* The page makes room for the menu: it narrows while the menu is open and widens again when it folds back to icons. */
+@media (min-width: 961px) {
+  .app { transition: grid-template-columns 0.2s var(--ease); }
+  .app.mini:has(> .side:is(:hover, :has(:focus-visible))) { grid-template-columns: var(--side-w) minmax(0, 1fr); }
+  .app.mini .side:is(:hover, :has(:focus-visible)) { box-shadow: none; }
 }

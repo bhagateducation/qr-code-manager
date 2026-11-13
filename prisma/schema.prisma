@@ -55,6 +55,10 @@ model User {
   passwordHash String
   role         String     @default("owner") // workspace role, not platform administrator
   platformAdmin Boolean   @default(false)
+  loginCodeHash String?   // email sign-in code, hashed; cleared once used
+  loginCodeExpires DateTime?
+  loginCodeTries Int      @default(0)
+  notificationsSeenAt DateTime?
   mfaEnabled   Boolean   @default(false)
   mfaSecret    String?
   backupCodes  Json?
@@ -145,6 +149,7 @@ model QRCode {
   folderId     String?
   number       Int        @default(0) // human-friendly number, unique per workspace
   deletedAt    DateTime?  // set while the code sits in the trash
+  position     Int        @default(0) // manual order inside folders; new codes take their number
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -266,6 +271,7 @@ model Folder {
   parentId    String?
   name        String
   kind        String    @default("folder") // folder, book, chapter
+  position    Int       @default(0)
   createdAt   DateTime  @default(now())
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -407,4 +413,18 @@ model SiteSetting {
   updatedAt DateTime @updatedAt
 
   @@map("site_settings")
+}
+
+/// Messages shown under the bell in the panel. workspaceId null means every client.
+model Notification {
+  id          String   @id @default(uuid())
+  workspaceId String?
+  title       String
+  body        String   @db.Text
+  link        String?
+  kind        String   @default("update") // update, feature, billing, alert
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@map("notifications")
 }

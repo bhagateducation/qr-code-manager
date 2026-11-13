@@ -21,7 +21,7 @@ npm run dev
 | --- | --- |
 | `npm run lint` | TypeScript |
 | `npm test` | Validation, payment signatures, QR decode for every colour and correction level |
-| `node tests/integration.mjs` | 144 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
+| `node tests/integration.mjs` | 160 HTTP checks against a running local server: auth, tenant isolation, roles, numbering, search, trash, bulk actions, folders, Book QR, quotas, API keys, two-step sign-in, sessions, billing forgery. Creates disposable accounts, so never point it at production. |
 
 ## Structure
 
@@ -45,6 +45,11 @@ npm run dev
 | `components/Owner.tsx` | Platform owner: Clients, Plans, Website. |
 | `components/Account.tsx` | Panels and custom-domain set-up. |
 | `components/FolderPicker.tsx` | Folder tree with search and in-place folder creation. |
+| `components/Bulk.tsx` | Many codes at once, YouTube playlist import, Excel/Word/CSV import, folder settings. |
+| `lib/office.ts` | Excel and Word export with QR images, import format files and the import reader. |
+| `lib/youtube.ts` | Reads a public playlist (official Data API with `YOUTUBE_API_KEY`, otherwise the first 100 videos from the public page). |
+| `lib/email.ts`, `lib/secrets.ts` | Email by SMTP or Resend, configurable from the panel; panel-saved secrets are encrypted. |
+| `app/q/[code]` | Share page that shows a code's QR image, and the friendly page for paused or link-less codes. |
 | `lib/brand.ts` | Product name and support email, set with `NEXT_PUBLIC_BRAND_NAME` and `NEXT_PUBLIC_SUPPORT_EMAIL`. |
 
 ## Roles
@@ -61,8 +66,8 @@ npm run dev
 These need your own accounts or decisions and are not done by the code:
 
 1. A MySQL database and the environment values in `.env.example`.
-2. Razorpay keys and webhook secret. Until they are set, checkout is off and plans can only be granted from the Clients panel.
-3. A Resend API key if you want password-reset, verification and invitation emails to be delivered. Without it, invitation links are shown to the owner to copy.
+2. Razorpay keys and webhook secret, entered under **Configuration** in the panel (or as environment values). Until they are set, checkout is off and plans can only be granted from the Clients panel.
+3. Email settings under **Configuration** (Hostinger SMTP or Resend) so reminders, receipts, sign-in codes and invitations are delivered. Without them, invitation links are shown to the owner to copy.
 4. Terms, privacy and refund pages.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/USER-GUIDE.md](docs/USER-GUIDE.md).

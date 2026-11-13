@@ -8,6 +8,7 @@ export type QR = {
   number: number;
   folderId?: string | null;
   deletedAt?: string | null;
+  position?: number;
   title: string;
   shortCode: string;
   targetUrl: string;
@@ -22,7 +23,7 @@ export type QR = {
   tags?: { tag: { id: string; name: string; color: string } }[];
 };
 /** A category. Folders nest (Book > Chapter); a code sits in at most one. */
-export type Folder = { id: string; parentId: string | null; name: string; kind: string; _count: { qrCodes: number } };
+export type Folder = { id: string; parentId: string | null; name: string; kind: string; position?: number; _count: { qrCodes: number } };
 /** The folder and its ancestors, outermost first. */
 export function folderTrail(folders: Folder[], id?: string | null) {
   const trail: Folder[] = [];
@@ -59,6 +60,7 @@ export type Data = {
   limits: Limits;
   appUrl: string;
   checkoutReady: boolean;
+  notifications: { items: Notice[]; unread: number };
   logs: { id: string; scannedAt: string; device: string; os: string; browser: string; qrCode: { title: string } }[];
   audit: { id: string; action: string; createdAt: string }[];
   payments: { id: string; plan: string; amount: number; status: string; createdAt: string }[];
@@ -70,6 +72,7 @@ export type Data = {
   webhookDeliveries: { id: string; eventType: string; status: string; responseCode: number | null; lastError: string | null; createdAt: string; webhook: { url: string } }[];
   invitations: { id: string; email: string; role: string; expiresAt: string }[];
 };
+export type Notice = { id: string; title: string; body: string; link: string | null; kind: string; createdAt: string; workspaceId?: string | null };
 /** How the QR list is narrowed and ordered. Sent to the server as query parameters. */
 export type Filters = { search: string; status: string; tag: string; campaign: string; type: string; folder: string; sort: string; size: string };
 export const noFilters: Filters = { search: "", status: "", tag: "", campaign: "", type: "", folder: "", sort: "", size: "25" };
@@ -103,6 +106,29 @@ export async function api(path: string, data?: unknown) {
   if (response.status === 401 && !path.startsWith("/api/auth/")) window.location.assign("/login");
   if (!response.ok) throw new Error(result.error || "Unable to complete this request.");
   return result;
+}
+/** A YouTube video id from a watch, short or youtu.be link. */
+export const youtubeId = (url: string) => /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/.exec(url)?.[1] || null;
+/** True while a code has no link of its own yet and shows its QR page instead. */
+export const isWaiting = (qr: QR) => qr.targetUrl.endsWith(`/q/${qr.shortCode}`);
+export const shareLink = (data: Data, qr: QR) => `${data.linkBase}/q/${qr.shortCode}`;
+/** A small dropdown built on <details>: closes when an item is chosen or on a click elsewhere. */
+export function Menu({ label, icon: Icon, children, primary, align = "right" }: { label: string; icon?: LucideIcon; children: React.ReactNode; primary?: boolean; align?: "left" | "right" }) {
+  useEffect(() => {
+    const close = (event: MouseEvent) => document.querySelectorAll("details.dropdown[open]").forEach((menu) => !menu.contains(event.target as Node) && menu.removeAttribute("open"));
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
+  return (
+    <details className={`dropdown ${align}`}>
+      <summary className={`button ${primary ? "primary" : ""}`}>
+        {Icon && <Icon size={15} />} <span className="hide-sm">{label}</span>
+      </summary>
+      <div className="menu-pop" role="menu" onClick={(event) => (event.target as HTMLElement).closest("button,a") && event.currentTarget.parentElement?.removeAttribute("open")}>
+        {children}
+      </div>
+    </details>
+  );
 }
 export function saveFile(name: string, content: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -322,16 +348,17 @@ export function Drive({ used, limitMb, label = "Storage" }: { used: number; limi
 
 export type Label = { title: string; number?: number } | null;
 /** The QR as a PNG, optionally with its name and number printed underneath. */
-export async function qrPng(payload: string, style: { dark?: string; errorCorrectionLevel?: string } = {}, label: Label = null): Promise<Blob> {
+export async function qrPng(payload: string, style: { dark?: string; errorCorrectionLevel?: string } = {}, label: Label = null, width = 1024): Promise<Blob> {
   const { default: QRCode } = await import("qrcode");
   const code = document.createElement("canvas");
-  await QRCode.toCanvas(code, payload, { width: 1024, margin: 4, errorCorrectionLevel: (style.errorCorrectionLevel as "M") || "M", color: { dark: style.dark || "#17161D", light: "#FFFFFF" } });
+  await QRCode.toCanvas(code, payload, { width, margin: 4, errorCorrectionLevel: (style.errorCorrectionLevel as "M") || "M", color: { dark: style.dark || "#17161D", light: "#FFFFFF" } });
   let out = code;
   if (label) {
+    const k = width / 1024;
     await document.fonts?.load("600 52px Poppins").catch(() => {});
     out = document.createElement("canvas");
     out.width = code.width;
-    out.height = code.height + (label.number ? 150 : 96);
+    out.height = code.height + Math.round((label.number ? 150 : 96) * k);
     const pen = out.getContext("2d")!;
     pen.fillStyle = "#fff";
     pen.fillRect(0, 0, out.width, out.height);
@@ -339,14 +366,14 @@ export async function qrPng(payload: string, style: { dark?: string; errorCorrec
     pen.textAlign = "center";
     pen.textBaseline = "top";
     pen.fillStyle = "#15161a";
-    pen.font = "600 52px Poppins, sans-serif";
+    pen.font = `600 ${Math.round(52 * k)}px Poppins, sans-serif`;
     let title = label.title;
-    while (title.length > 1 && pen.measureText(title).width > out.width - 96) title = title.slice(0, -2) + "…";
-    pen.fillText(title, out.width / 2, code.height - 24);
+    while (title.length > 1 && pen.measureText(title).width > out.width - 96 * k) title = title.slice(0, -2) + "…";
+    pen.fillText(title, out.width / 2, code.height - 24 * k);
     if (label.number) {
       pen.fillStyle = "#555863";
-      pen.font = "500 40px Poppins, sans-serif";
-      pen.fillText(qrNumber(label.number), out.width / 2, code.height + 50);
+      pen.font = `500 ${Math.round(40 * k)}px Poppins, sans-serif`;
+      pen.fillText(qrNumber(label.number), out.width / 2, code.height + 50 * k);
     }
   }
   return new Promise((resolve, reject) => out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("The image could not be created."))), "image/png"));

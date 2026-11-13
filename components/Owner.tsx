@@ -216,7 +216,7 @@ function ClientDetail({ client, report, act, ask, switchPanel, onClose }: { clie
   return (
     <Modal wide title={client.name} onClose={onClose}>
       <div className="tabs" role="group" aria-label="Client sections">
-        {[["overview", "Overview"], ["plan", "Plan and limits"], ["payments", "Payments"], ["notes", "Notes"]].map(([id, label]) => (
+        {[["overview", "Overview"], ["plan", "Plan and limits"], ["payments", "Payments"], ["email", "Email"], ["notes", "Notes"]].map(([id, label]) => (
           <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
             {label}
           </button>
@@ -411,6 +411,42 @@ function ClientDetail({ client, report, act, ask, switchPanel, onClose }: { clie
             ))}
             {!client.payments.length && <small>No payments yet.</small>}
           </div>
+        </div>
+      )}
+      {tab === "email" && (
+        <div className="stack">
+          <p className="muted">Sends now to {client.owner?.email || "the account owner"}. Reminders and receipts also go out on their own.</p>
+          <div className="row-actions">
+            <button className="button" onClick={() => act("client.email", { kind: "reminder" }, client.id, "Reminder sent.").catch(() => {})}>
+              Plan ending reminder
+            </button>
+            <button className="button" onClick={() => act("client.email", { kind: "expired" }, client.id, "Plan-ended email sent.").catch(() => {})}>
+              Plan ended
+            </button>
+            <button className="button" onClick={() => act("client.email", { kind: "receipt" }, client.id, "Receipt sent.").catch(() => {})}>
+              Last payment receipt
+            </button>
+          </div>
+          <form
+            className="stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              act("client.email", { kind: "custom", subject: form.get("subject"), text: form.get("text") }, client.id, "Email sent.").catch(() => {});
+            }}
+          >
+            <label>
+              Subject
+              <input name="subject" required maxLength={150} />
+            </label>
+            <label>
+              Message
+              <textarea name="text" required rows={6} maxLength={4000} />
+            </label>
+            <button className="button primary" style={{ justifySelf: "start" }}>
+              Send email
+            </button>
+          </form>
         </div>
       )}
       {tab === "notes" && (
@@ -656,5 +692,357 @@ export function Website({ ctx }: { ctx: Ctx }) {
         </div>
       </div>
     </form>
+  );
+}
+
+type Order = { id: string; workspaceId: string; client: string; email: string; orderId: string; paymentId: string | null; status: string; plan: string; amount: number; method: string; note: string | null; createdAt: string; paidAt: string | null };
+type Extra = {
+  orders: Order[];
+  gateway: { source: "env" | "panel" | "none"; keyId: string; live: boolean; webhook: boolean; webhookUrl: string };
+  email: { configured: boolean; source: string; from: string; saved: { provider: "smtp" | "resend"; from: string; host: string; port: number; user: string; hasSecret: boolean } | null };
+  security: { loginOtp: "off" | "owners" | "all" };
+  notifications: { id: string; workspaceId: string | null; title: string; body: string; link: string | null; kind: string; createdAt: string }[];
+};
+
+/** Every purchase: Razorpay orders (paid or pending) and payments recorded by hand. */
+export function Payments({ ctx }: { ctx: Ctx }) {
+  const { report, act } = usePlatform(ctx.notify);
+  const [status, setStatus] = useState("");
+  const [term, setTerm] = useState("");
+  if (!report) return <div className="skeleton" style={{ height: 320 }} />;
+  const { orders, gateway } = report as Report & Extra;
+  const shown = orders.filter((order) => (!status || order.status === status) && (!term || `${order.client} ${order.email} ${order.orderId} ${order.paymentId || ""}`.toLowerCase().includes(term.toLowerCase())));
+  const paid = orders.filter((order) => order.status === "paid");
+  const month = paid.filter((order) => Date.now() - Date.parse(order.paidAt || order.createdAt) < 30 * 86400000);
+  function exportCsv() {
+    const cell = (value: unknown) => `"${String(value ?? "").replace(/^[=+@-]/, "'$&").replaceAll('"', '""')}"`;
+    const rows = [["Date", "Client", "Email", "Plan", "Amount (₹)", "Method", "Status", "Order", "Payment", "Note"], ...shown.map((o) => [o.createdAt, o.client, o.email, o.plan, o.amount / 100, o.method, o.status, o.orderId, o.paymentId, o.note])];
+    const url = URL.createObjectURL(new Blob([rows.map((row) => row.map(cell).join(",")).join("\r\n")], { type: "text/csv" }));
+    Object.assign(document.createElement("a"), { href: url, download: "payments.csv" }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  return (
+    <div className="page-stack">
+      {gateway.source === "none" && (
+        <div className="banner warn">
+          <span className="grow">Razorpay is not connected, so clients cannot buy plans on the website yet. You can still record cash, UPI or bank payments from Clients.</span>
+          <button className="button small" onClick={() => ctx.go("configuration")}>
+            Connect Razorpay
+          </button>
+        </div>
+      )}
+      <div className="stats-grid panel">
+        {[
+          ["Last 30 days", rupees(month.reduce((sum, order) => sum + order.amount, 0))],
+          ["All time", rupees(paid.reduce((sum, order) => sum + order.amount, 0))],
+          ["Paid orders", paid.length.toLocaleString()],
+          ["Pending", orders.filter((order) => order.status === "created").length.toLocaleString()],
+        ].map(([label, value]) => (
+          <div className="stat" key={label}>
+            <small>{label}</small>
+            <strong className="num">{value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="panel flush">
+        <div className="toolbar">
+          <div className="search">
+            <Search size={16} />
+            <input type="search" aria-label="Search payments" placeholder="Client, email, order or payment id…" value={term} onChange={(e) => setTerm(e.target.value)} />
+          </div>
+          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="paid">Paid</option>
+            <option value="created">Pending (checkout opened, not paid)</option>
+          </select>
+          <span className="grow" />
+          <button className="button" onClick={exportCsv}>
+            Export CSV
+          </button>
+        </div>
+        {shown.length ? (
+          <div className="table-scroll">
+            <table className="cards">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Plan</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((order) => (
+                  <tr key={order.id}>
+                    <td>
+                      <strong>{order.client}</strong>
+                      <small className="muted" style={{ display: "block" }}>
+                        {order.email}
+                      </small>
+                    </td>
+                    <td data-label="Plan">{report.plans.find((plan) => plan.id === order.plan)?.name || order.plan}</td>
+                    <td data-label="Amount" className="num">
+                      {rupees(order.amount)}
+                      <small className="muted" style={{ display: "block", textTransform: "uppercase" }}>
+                        {order.method}
+                      </small>
+                    </td>
+                    <td data-label="Status">
+                      <span className={`badge ${order.status === "paid" ? "success" : "warn"}`}>{order.status === "paid" ? "Paid" : "Pending"}</span>
+                    </td>
+                    <td data-label="Date">
+                      <small>{formatDateTime(order.paidAt || order.createdAt)}</small>
+                      <small className="muted num" style={{ display: "block" }} title="Razorpay payment or order id">
+                        {order.paymentId || (order.method === "razorpay" ? order.orderId : order.note) || ""}
+                      </small>
+                    </td>
+                    <td className="actions">
+                      <div className="row-actions" style={{ justifyContent: "flex-end" }}>
+                        {order.status !== "paid" && order.method === "razorpay" && (
+                          <button className="button small" title="Ask Razorpay whether this order was paid and activate the plan if it was" onClick={() => act("order.check", undefined, order.id, "Payment found and the plan is active.").catch(() => {})}>
+                            Check with Razorpay
+                          </button>
+                        )}
+                        {order.status === "paid" && (
+                          <button className="button small" onClick={() => act("client.email", { kind: "receipt" }, order.workspaceId, "Receipt sent.").catch(() => {})}>
+                            Send receipt
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty icon={Gem} title="No payments yet" text="Purchases from your website and payments you record from Clients show up here." />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Platform settings in one place: Razorpay, email, sign-in security and notifications. */
+export function Configuration({ ctx }: { ctx: Ctx }) {
+  const { report, act } = usePlatform(ctx.notify);
+  const [mail, setMail] = useState<{ provider: "smtp" | "resend"; from: string; host: string; port: number; user: string; pass: string; resendKey: string; to: string } | null>(null);
+  useEffect(() => {
+    const saved = (report as (Report & Extra) | null)?.email.saved;
+    if (report && !mail) setMail({ provider: saved?.provider || "smtp", from: saved?.from || "", host: saved?.host || "smtp.hostinger.com", port: saved?.port || 465, user: saved?.user || "", pass: "", resendKey: "", to: "" });
+  }, [report, mail]);
+  if (!report || !mail) return <div className="skeleton" style={{ height: 320 }} />;
+  const { gateway, email, security, notifications } = report as Report & Extra;
+  const mailData = { provider: mail.provider, from: mail.from, host: mail.host, port: mail.port, user: mail.user, pass: mail.pass || undefined, resendKey: mail.resendKey || undefined };
+  return (
+    <div className="page-stack">
+      <section className="panel stack">
+        <div>
+          <h2>
+            Payments · Razorpay <Info text="Razorpay Dashboard → Account & Settings → API Keys gives the Key ID and Key Secret. Use test keys first, then live keys. Keys in the server environment (RAZORPAY_KEY_ID) take priority over keys saved here." />
+          </h2>
+          <p className="muted">
+            {gateway.source === "none" ? "Not connected: website checkout is off." : `Connected (${gateway.live ? "live" : "test"} keys, ${gateway.source === "env" ? "from server settings" : "saved here"}): ${gateway.keyId}`}
+          </p>
+        </div>
+        {gateway.source !== "env" && (
+          <form
+            className="stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const element = event.currentTarget;
+              const form = new FormData(element);
+              act("razorpay.save", { keyId: form.get("keyId"), keySecret: form.get("keySecret"), webhookSecret: form.get("webhookSecret") || undefined }, undefined, "Razorpay connected. Clients can now buy plans.").then(() => element.reset(), () => {});
+            }}
+          >
+            <div className="form-grid">
+              <label>
+                Key ID
+                <input name="keyId" required placeholder="rzp_live_…" autoComplete="off" />
+              </label>
+              <label>
+                Key Secret
+                <input name="keySecret" required type="password" autoComplete="new-password" />
+              </label>
+            </div>
+            <label>
+              Webhook secret (recommended)
+              <Info text={`In Razorpay → Webhooks, add ${gateway.webhookUrl} with the events payment.captured and order.paid, choose a secret, and paste the same secret here. Then plans activate even if a buyer closes the page right after paying.`} />
+              <input name="webhookSecret" type="password" autoComplete="new-password" />
+              <small>
+                Webhook URL: <code>{gateway.webhookUrl}</code>
+              </small>
+            </label>
+            <div className="row-actions">
+              <button className="button primary">Save and test</button>
+              {gateway.source === "panel" && (
+                <>
+                  <button type="button" className="button" onClick={() => act("razorpay.test", undefined, undefined, "Razorpay answered: the keys work.").catch(() => {})}>
+                    Test connection
+                  </button>
+                  <button type="button" className="button danger" onClick={async () => (await ctx.ask({ title: "Disconnect Razorpay?", body: "Website checkout stops until you connect it again. Past payments stay.", action: "Disconnect" })) && act("razorpay.remove", undefined, undefined, "Razorpay disconnected.").catch(() => {})}>
+                    Disconnect
+                  </button>
+                </>
+              )}
+            </div>
+          </form>
+        )}
+      </section>
+
+      <section className="panel stack">
+        <div>
+          <h2>
+            Email <Info text="Used for sign-in codes, password resets, invitations, plan reminders, receipts and your notifications. With Hostinger email: host smtp.hostinger.com, port 465, your full mailbox address as user, and its password." />
+          </h2>
+          <p className="muted">{email.configured ? `Sending as ${email.from}${email.source === "env" ? " (Resend, from server settings)" : ""}.` : "Not set up: no emails are sent yet."}</p>
+        </div>
+        <div className="segmented" role="group" aria-label="Email service">
+          {(["smtp", "resend"] as const).map((provider) => (
+            <button key={provider} aria-pressed={mail.provider === provider} onClick={() => setMail({ ...mail, provider })}>
+              {provider === "smtp" ? "SMTP (Hostinger, Gmail…)" : "Resend"}
+            </button>
+          ))}
+        </div>
+        <label>
+          From address
+          <input value={mail.from} placeholder="QR Manager <support@yourdomain.com>" onChange={(e) => setMail({ ...mail, from: e.target.value })} />
+        </label>
+        {mail.provider === "smtp" ? (
+          <div className="form-grid">
+            <label>
+              SMTP host
+              <input value={mail.host} onChange={(e) => setMail({ ...mail, host: e.target.value })} />
+            </label>
+            <label>
+              Port
+              <input type="number" value={mail.port} onChange={(e) => setMail({ ...mail, port: Number(e.target.value) })} />
+            </label>
+            <label>
+              User (mailbox)
+              <input value={mail.user} autoComplete="off" onChange={(e) => setMail({ ...mail, user: e.target.value })} />
+            </label>
+            <label>
+              Password
+              <input type="password" autoComplete="new-password" placeholder={email.saved?.hasSecret ? "Saved — leave empty to keep" : ""} value={mail.pass} onChange={(e) => setMail({ ...mail, pass: e.target.value })} />
+            </label>
+          </div>
+        ) : (
+          <label>
+            Resend API key
+            <input type="password" autoComplete="new-password" placeholder={email.saved?.hasSecret ? "Saved — leave empty to keep" : "re_…"} value={mail.resendKey} onChange={(e) => setMail({ ...mail, resendKey: e.target.value })} />
+          </label>
+        )}
+        <div className="row-actions">
+          <input aria-label="Send the test to" style={{ maxWidth: 260 }} placeholder="Test to (default: your email)" value={mail.to} onChange={(e) => setMail({ ...mail, to: e.target.value })} />
+          <button className="button" onClick={() => act("email.test", { ...mailData, to: mail.to || undefined }, undefined, "Test email sent. Check the inbox (and spam).").catch(() => {})}>
+            Send test
+          </button>
+          <button className="button primary" onClick={() => act("email.save", mailData, undefined, "Email settings saved.").catch(() => {})}>
+            Save
+          </button>
+        </div>
+      </section>
+
+      <section className="panel stack">
+        <div>
+          <h2>
+            Sign-in security <Info text="After the password, we email a 6-digit code that works for 10 minutes. People who use an authenticator app enter that code instead. While email is not set up, no code is asked, so nobody gets locked out." />
+          </h2>
+          <p className="muted">Email code at sign-in</p>
+        </div>
+        <div className="segmented" role="group" aria-label="Email code at sign-in">
+          {[
+            ["off", "Off"],
+            ["owners", "Account owners and me"],
+            ["all", "Everyone"],
+          ].map(([value, label]) => (
+            <button key={value} aria-pressed={security.loginOtp === value} onClick={() => act("security.save", { loginOtp: value }, undefined, "Sign-in security saved.").catch(() => {})}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {security.loginOtp !== "off" && !email.configured && <p className="notice warn flat">Set up email above first; until then no code is asked at sign-in.</p>}
+      </section>
+
+      <section className="panel stack">
+        <div>
+          <h2>
+            Notifications <Info text="Shown under the bell in every client's panel (or one client's). Tick email to also send it to account owners. Plan reminders and payment confirmations are added automatically." />
+          </h2>
+        </div>
+        <form
+          className="stack"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const element = event.currentTarget;
+            const form = new FormData(element);
+            act("notification.send", { title: form.get("title"), body: form.get("body"), link: form.get("link") || undefined, kind: form.get("kind"), audience: form.get("audience"), email: form.get("email") === "on" }, undefined, "Notification sent.").then(() => element.reset(), () => {});
+          }}
+        >
+          <div className="form-grid">
+            <label>
+              Send to
+              <select name="audience" defaultValue="all">
+                <option value="all">Every client</option>
+                {report.clients
+                  .filter((client) => !client.isPlatform)
+                  .map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Type
+              <select name="kind" defaultValue="feature">
+                <option value="feature">New feature</option>
+                <option value="update">Update</option>
+                <option value="alert">Important</option>
+                <option value="billing">Billing</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Title
+            <input name="title" required maxLength={120} placeholder="New: QR codes from YouTube playlists" />
+          </label>
+          <label>
+            Message
+            <textarea name="body" required rows={4} maxLength={2000} />
+          </label>
+          <label>
+            Link (optional)
+            <input name="link" maxLength={190} placeholder="https://… or #codes to open a panel page" />
+          </label>
+          <label className="toggle-row">
+            <input type="checkbox" name="email" /> Also email it to account owners
+          </label>
+          <button className="button primary" style={{ justifySelf: "start" }}>
+            <Bell size={15} /> Send notification
+          </button>
+        </form>
+        <div className="feature-list">
+          {notifications.map((item) => (
+            <div className="feature-row" key={item.id}>
+              <div>
+                <strong>{item.title}</strong>
+                <small>
+                  {formatDateTime(item.createdAt)} · {item.workspaceId ? report.clients.find((client) => client.id === item.workspaceId)?.name || "One client" : "Every client"} · {item.kind}
+                </small>
+              </div>
+              <button className="icon-button danger" aria-label={`Delete notification ${item.title}`} onClick={() => act("notification.delete", undefined, item.id, "Notification removed.").catch(() => {})}>
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }

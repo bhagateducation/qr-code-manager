@@ -11,7 +11,7 @@ import {
   rateLimit,
   boundedText,
 } from "@/lib/http";
-import { razorpay, settle } from "@/lib/payments";
+import { paymentKeys, razorpay, settle } from "@/lib/payments";
 import { validSignature } from "@/lib/payment-signature";
 export async function POST(
   request: NextRequest,
@@ -19,8 +19,9 @@ export async function POST(
 ) {
   try {
     const { action } = await params;
+    const keys = await paymentKeys();
     if (action === "webhook") {
-      if (!process.env.RAZORPAY_WEBHOOK_SECRET)
+      if (!keys.webhookSecret)
         throw new ApiError(503, "Webhook is not configured.");
       if (Number(request.headers.get("content-length") || 0) > 65536)
         throw new ApiError(413, "Payload too large.");
@@ -29,7 +30,7 @@ export async function POST(
         !validSignature(
           raw,
           request.headers.get("x-razorpay-signature") || "",
-          process.env.RAZORPAY_WEBHOOK_SECRET,
+          keys.webhookSecret,
         )
       )
         throw new ApiError(401, "Invalid signature.");
@@ -55,14 +56,14 @@ export async function POST(
       if (
         !Number.isSafeInteger(amount) ||
         amount < 100 ||
-        !process.env.RAZORPAY_WEBHOOK_SECRET
+        !keys.keySecret
       )
         throw new ApiError(503, "Paid plans are not available yet.");
       const order = await razorpay("orders", {
         amount,
         currency: "INR",
         receipt: randomUUID(),
-      });
+      }, keys);
       await prisma.payment.create({
         data: {
           workspaceId: user.workspaceId,
@@ -76,7 +77,7 @@ export async function POST(
         orderId: order.id,
         amount,
         currency: "INR",
-        key: process.env.RAZORPAY_KEY_ID,
+        key: keys.keyId,
       });
     }
     if (action === "verify") {
@@ -98,7 +99,7 @@ export async function POST(
         !validSignature(
           `${order.orderId}|${data.razorpay_payment_id}`,
           data.razorpay_signature,
-          process.env.RAZORPAY_KEY_SECRET || "",
+          keys.keySecret,
         )
       )
         throw new ApiError(400, "Payment signature could not be verified.");

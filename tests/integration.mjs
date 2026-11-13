@@ -163,7 +163,7 @@ check(
   "iOS conditional routing",
 );
 await request("/api/workspace", { action: "qr.pause", id: qr.id }, cookie);
-check((await request(`/s/${qr.shortCode}`)).status === 410, "paused QR denied");
+check(((await request(`/s/${qr.shortCode}`)).headers.get("location") || "").includes("state=paused"), "paused QR does not open its link and shows a friendly page");
 check(
   (await request("/s/missing-test-code")).status === 404,
   "unknown QR returns 404",
@@ -277,7 +277,7 @@ const expiring = await request(
 );
 check(
   expiring.status === 200 &&
-    (await request(`/s/${expiring.data.entity.shortCode}`)).status === 410,
+    ((await request(`/s/${expiring.data.entity.shortCode}`)).headers.get("location") || "").includes("state=paused"),
   "expired QR does not resolve",
 );
 check(
@@ -450,7 +450,7 @@ check((await request(`/s/${n1.shortCode}`)).status === 302, "restored code resol
 check((await act("qr.bulk", { ids: [n2.id], op: "purge" })).status === 200 && !(await list("status=trash")).data.qrCodes.some((qr) => qr.id === n2.id), "owner deletes permanently");
 const n3 = (await act("qr.create", { title: "Numbered three", targetUrl: "https://example.com/n3" })).data.entity;
 check(n3.number === n2.number + 1, "a deleted number is never reused");
-check((await act("qr.bulk", { ids: [n1.id, n3.id], op: "pause" })).status === 200 && (await request(`/s/${n3.shortCode}`)).status === 410, "bulk pause stops codes resolving");
+check((await act("qr.bulk", { ids: [n1.id, n3.id], op: "pause" })).status === 200 && ((await request(`/s/${n3.shortCode}`)).headers.get("location") || "").includes("state=paused"), "bulk pause stops codes resolving");
 check((await act("qr.bulk", { ids: Array.from({ length: 101 }, (_, i) => `id-${i}`), op: "pause" })).status === 400, "bulk actions are capped at 100 codes");
 const second = await request("/api/auth/login", { email: b.email, password });
 check((await request("/api/auth/logout-others", {}, second.cookie)).data.ended >= 1, "sign out other devices ends other sessions");
@@ -553,6 +553,36 @@ await platform("client.limits", { allowDomain: true }, bId);
 check((await act("domain.save", domainName, undefined, me)).status === 200 && (await listB("")).data.domain.status === "pending", "a client adds a custom domain");
 check((await act("domain.use", true, undefined, me)).status === 409 && (await listB("")).data.linkBase === base, "an unverified domain is never printed in QR codes");
 // Only one platform owner may exist; take the test one away again.
+
+// --- v3.1: many codes, manual order, never-error scans, share page, import updates, folder delete with codes, notifications ---
+await platform("client.limits", { allowDomain: true, codes: null }, bId);
+const bulkFolder = (await act("folder.create", { name: "Bulk QA" }, undefined, me)).data.entity;
+check((await act("codes.bulk", { folderId: bulkFolder.id, start: 1, count: 3, title: "Q{n}" }, undefined, me)).status === 200, "many numbered codes are made inside a folder");
+const inBulk = (await listB("folder=" + bulkFolder.id + "&sort=position")).data.qrCodes;
+check(inBulk.map((qr) => qr.title).join() === "Q1,Q2,Q3", "a folder lists its codes in manual order");
+const waitingHop = await request("/s/" + inBulk[0].shortCode);
+check(waitingHop.status === 302 && (waitingHop.headers.get("location") || "").includes("/q/" + inBulk[0].shortCode), "a code without a link opens its own QR page instead of an error");
+const sharePage = await request("/q/" + inBulk[0].shortCode);
+check(sharePage.status === 200 && sharePage.text.includes("<svg") && sharePage.text.includes("Q1"), "the share page shows the QR image, title and number");
+check((await request("/q/" + inBulk[0].shortCode + "/image?format=png&size=2048")).headers.get("content-type") === "image/png", "the share page offers a PNG download");
+await act("qr.place", { index: 1, folder: bulkFolder.id }, inBulk[2].id, me);
+check((await listB("folder=" + bulkFolder.id + "&sort=position")).data.qrCodes.map((qr) => qr.title).join() === "Q3,Q1,Q2", "a code can be moved to a typed position");
+const update = await act("qr.import", { rows: [{ number: inBulk[0].number, title: "Q1 renamed", url: "https://example.com/q1" }] }, undefined, me);
+const renamed = (await listB("search=Q1 renamed")).data.qrCodes[0];
+check(update.status === 200 && renamed?.id === inBulk[0].id && renamed.targetUrl === "https://example.com/q1", "an import row with a QR number updates that code instead of making a new one");
+await act("qr.pause", undefined, inBulk[1].id, me);
+check(((await request("/s/" + inBulk[1].shortCode)).headers.get("location") || "").includes("state=paused"), "a paused code shows a friendly page, not an error");
+check((await act("folder.delete", { trashCodes: true }, bulkFolder.id, me)).status === 200 && (await listB("status=trash&search=Q3")).data.total >= 1, "deleting a folder can move its codes to the trash");
+const otherBook = (await act("folder.create", { name: "Shelf" }, undefined, me)).data.entity;
+const book2 = await act("book.create", { title: "Linkless book", parentId: otherBook.id, chapters: [{ name: "Ch 1", questions: 2 }] }, undefined, me);
+check(book2.status === 200 && (await listB("")).data.folders.find((item) => item.id === book2.data.entity.id)?.parentId === otherBook.id, "a book can be made inside a chosen folder without links");
+check(Array.isArray((await listB("")).data.notifications.items), "the panel receives notifications");
+check((await request("/api/notifications", {}, me)).status === 200, "notifications can be marked as read");
+check((await request("/api/platform", { action: "notification.send", data: { title: "QA", body: "Hello", kind: "update", audience: "all" } }, me)).status === 403, "only the platform owner sends notifications");
+check((await platform("notification.send", { title: "QA notice", body: "Hello clients", kind: "feature", audience: "all" })).status === 200 && (await listB("")).data.notifications.items.some((item) => item.title === "QA notice"), "the platform owner's notification reaches clients");
+check((await platform("security.save", { loginOtp: "all" })).status === 200 && (await request("/api/auth/login", { email: b.email, password })).status === 200, "the sign-in email code is skipped while email is not set up, so nobody is locked out");
+await platform("security.save", { loginOtp: "off" });
+check((await platform("razorpay.save", { keyId: "rzp_test_abcdef123", keySecret: "not-a-real-secret" })).status === 400, "Razorpay keys are tested before they are saved");
 await db.user.update({ where: { email: p.email }, data: { platformAdmin: false } });
 await db.$disconnect();
 console.log(`${passed} integration checks passed.`);

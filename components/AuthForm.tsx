@@ -11,7 +11,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState<false | { method?: string; sentTo?: string }>(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -19,7 +19,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
     setBusy(true);
     try {
       const result = await api(`/api/auth/${register ? "register" : "login"}`, Object.fromEntries(new FormData(event.currentTarget)));
-      if (result.mfaRequired) setMfaRequired(true);
+      if (result.mfaRequired) setMfaRequired({ method: result.method, sentTo: result.sentTo });
       else if (result.emailVerificationRequired) setMessage("Account created. Open the link we emailed you to verify your address, then sign in.");
       else return window.location.assign("/dashboard");
     } catch (e) {
@@ -73,9 +73,11 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
           <AnimatePresence>
             {mfaRequired && (
               <motion.label initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} style={{ overflow: "hidden" }}>
-                Authenticator or backup code
-                <input name="mfaCode" maxLength={20} required autoFocus autoComplete="one-time-code" placeholder="000000" />
-                <small>Enter the 6-digit code from your authenticator app, or one of your backup codes.</small>
+                {mfaRequired.method === "email" ? "Code from your email" : "Authenticator or backup code"}
+                <input name="mfaCode" maxLength={20} required autoFocus autoComplete="one-time-code" inputMode={mfaRequired.method === "email" ? "numeric" : undefined} placeholder="000000" />
+                <small>
+                  {mfaRequired.method === "email" ? `We emailed a 6-digit code to ${mfaRequired.sentTo}. It works for 10 minutes. Check spam if it is not in your inbox.` : "Enter the 6-digit code from your authenticator app, or one of your backup codes."}
+                </small>
               </motion.label>
             )}
           </AnimatePresence>
