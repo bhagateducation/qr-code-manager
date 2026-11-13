@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, QrCode } from "lucide-react";
+import { ArrowRight, Download, Lock, QrCode } from "lucide-react";
 import { buildVCardPayload, buildWifiPayload } from "@/lib/qr-payload";
 import { QR_TYPES } from "@/lib/qr-types";
 
@@ -32,12 +32,19 @@ export function LiveDemo() {
   const [path, setPath] = useState({ d: "", size: 29 });
   const [state, setState] = useState<{ kind: "idle" | "busy" | "done" | "used" | "error"; text?: string }>({ kind: "idle" });
   const payload = payloadOf(kind, values);
+  // Once the free code is used, the real code is not drawn at all: a blurred sample stands in until sign-in.
+  const locked = state.kind === "used";
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("qr-free-used")) setState({ kind: "used" });
+    } catch {}
+  }, []);
   useEffect(() => {
     let active = true;
     import("qrcode").then(({ default: QRCode }) => {
       if (!active) return;
       try {
-        const { modules } = QRCode.create(payload || SAMPLE, { errorCorrectionLevel: "M" });
+        const { modules } = QRCode.create((!locked && payload) || SAMPLE, { errorCorrectionLevel: "M" });
         let d = "";
         for (let y = 0; y < modules.size; y++) for (let x = 0; x < modules.size; x++) if (modules.get(y, x)) d += `M${x} ${y}h1v1h-1z`;
         setPath({ d, size: modules.size });
@@ -48,8 +55,13 @@ export function LiveDemo() {
     return () => {
       active = false;
     };
-  }, [payload]);
+  }, [payload, locked]);
 
+  const remember = () => {
+    try {
+      localStorage.setItem("qr-free-used", "1");
+    } catch {}
+  };
   async function download() {
     if (!payload) return setState({ kind: "error", text: "Fill in the details first." });
     setState({ kind: "busy" });
@@ -58,6 +70,7 @@ export function LiveDemo() {
       const response = await fetch("/api/free-qr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: kind.id, content: payload }) });
       if (!response.ok) {
         const text = ((await response.json().catch(() => null)) as { error?: string } | null)?.error || "Something went wrong. Please try again.";
+        if (response.status === 409) remember();
         return setState({ kind: response.status === 409 ? "used" : "error", text });
       }
       const { default: QRCode } = await import("qrcode");
@@ -65,6 +78,7 @@ export function LiveDemo() {
       link.href = await QRCode.toDataURL(payload, { width: 1024, margin: 4, errorCorrectionLevel: "M" });
       link.download = `${kind.id}-qr-code.png`;
       link.click();
+      remember();
       setState({ kind: "done" });
     } catch {
       setState({ kind: "error", text: "Something went wrong. Please try again." });
@@ -83,7 +97,7 @@ export function LiveDemo() {
           onChange={(event) => {
             setKind(kinds.find((item) => item.id === event.target.value) || kinds[0]);
             setValues({});
-            setState({ kind: "idle" });
+            setState({ kind: state.kind === "done" || locked ? "used" : "idle" });
           }}
         >
           {kinds.map((item) => (
@@ -100,7 +114,12 @@ export function LiveDemo() {
         </label>
       ))}
       <div className="demo-stage">
-        <div className="demo-qr">
+        <div className={`demo-qr ${locked ? "locked" : ""}`}>
+          {locked && (
+            <span className="demo-lock">
+              <Lock size={20} />
+            </span>
+          )}
           {path.d ? (
             <svg viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`${kind.name} preview`} shapeRendering="crispEdges">
               <path d={path.d} fill="#15161a" />
@@ -110,13 +129,19 @@ export function LiveDemo() {
           )}
         </div>
         <div className="demo-side">
-          <strong>{state.kind === "done" ? "Downloaded." : "Make 1 QR code free."}</strong>
+          <strong>{state.kind === "done" ? "Downloaded." : locked ? (payload ? "Your QR code is ready." : "Make another QR code.") : "Make 1 QR code free."}</strong>
           <p role="status">
             {state.kind === "done"
               ? "This free code cannot be edited later. Create a free account to change links after printing and see scans."
-              : state.text || "No account needed. Pick a type, fill it in and download the PNG."}
+              : locked
+                ? "You have used your free code. Sign in or create a free account to see and download this one."
+                : state.text || "No account needed. Pick a type, fill it in and download the PNG."}
           </p>
-          {state.kind === "done" || state.kind === "used" ? (
+          {locked ? (
+            <Link href="/login" className="button primary small" style={{ justifySelf: "start" }}>
+              <Download size={14} /> Sign in to download
+            </Link>
+          ) : state.kind === "done" ? (
             <Link href="/register" className="button primary small" style={{ justifySelf: "start" }}>
               Create free account <ArrowRight size={14} />
             </Link>

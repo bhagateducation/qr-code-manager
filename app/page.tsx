@@ -106,6 +106,24 @@ export default async function Home() {
           ))}
         </div>
 
+        <section id="qr-types" className="site-section">
+          <div className="section-intro">
+            <h2 className="display">Every kind of QR code, in one generator</h2>
+            <p>Make link, text, Wi-Fi, contact, book and question QR codes, and point a code at any image, PDF, video or page.</p>
+          </div>
+          <div className="type-grid">
+            {QR_TYPES.map((type) => (
+              <Link href="/register" className="type-card" key={type.name}>
+                <span className="page-icon" style={tone(type.tone)}>
+                  <type.icon size={18} />
+                </span>
+                <h3>{type.name}</h3>
+                <p>{type.text}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         {site.show.features && (
         <section id="features" className="site-section">
           <div className="section-intro">
@@ -201,24 +219,6 @@ export default async function Home() {
           </div>
         </section>
         )}
-
-        <section id="qr-types" className="site-section">
-          <div className="section-intro">
-            <h2 className="display">Every kind of QR code, in one generator</h2>
-            <p>Make link, text, Wi-Fi, contact, book and question QR codes, and point a code at any image, PDF, video or page.</p>
-          </div>
-          <div className="type-grid">
-            {QR_TYPES.map((type) => (
-              <Link href="/register" className="type-card" key={type.name}>
-                <span className="page-icon" style={tone(type.tone)}>
-                  <type.icon size={18} />
-                </span>
-                <h3>{type.name}</h3>
-                <p>{type.text}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
 
         {site.show.steps && (
         <section id="how-it-works" className="site-section">

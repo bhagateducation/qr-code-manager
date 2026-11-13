@@ -939,3 +939,8 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .choose-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .choose-item { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); font-size: 13px; font-weight: 600; text-align: left; transition: border-color 0.15s, background 0.15s, transform 0.15s; }
 .choose-item:hover { border-color: var(--brand); background: var(--brand-wash); transform: translateY(-1px); }
+
+/* Free generator after the free code is used: the preview is a blurred stand-in with a lock. */
+.demo-qr { position: relative; }
+.demo-qr.locked svg { filter: blur(7px); opacity: 0.55; }
+.demo-lock { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; color: #15161a; }

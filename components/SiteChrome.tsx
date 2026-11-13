@@ -20,8 +20,8 @@ export function SiteHeader({ show, home = false }: { show: Site["show"]; home?: 
             {BRAND}
           </Link>
           <nav aria-label="Main">
-            {show.features && <a href={`${base}#features`}>Features</a>}
             <a href={`${base}#qr-types`}>QR types</a>
+            {show.features && <a href={`${base}#features`}>Features</a>}
             {show.steps && <a href={`${base}#how-it-works`}>How it works</a>}
             {show.pricing && <a href={`${base}#pricing`}>Pricing</a>}
             {show.faq && <a href={`${base}#faq`}>FAQ</a>}
@@ -35,8 +35,8 @@ export function SiteHeader({ show, home = false }: { show: Site["show"]; home?: 
                 <X size={18} className="menu-close" />
               </summary>
               <nav aria-label="Mobile">
-                {show.features && <a href={`${base}#features`}>Features</a>}
                 <a href={`${base}#qr-types`}>QR types</a>
+                {show.features && <a href={`${base}#features`}>Features</a>}
                 {show.steps && <a href={`${base}#how-it-works`}>How it works</a>}
                 {show.pricing && <a href={`${base}#pricing`}>Pricing</a>}
                 {show.faq && <a href={`${base}#faq`}>FAQ</a>}
