@@ -944,3 +944,14 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .demo-qr { position: relative; }
 .demo-qr.locked svg { filter: blur(7px); opacity: 0.55; }
 .demo-lock { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; color: #15161a; }
+
+/* QR type popup on the launch page */
+.site button.type-card { width: 100%; text-align: left; cursor: pointer; font: inherit; }
+.site .type-dialog { width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: auto; padding: 16px; overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 20px; background: #0a1230; color: var(--ink); box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.8); }
+.site .type-dialog[open] { animation: site-rise 0.3s var(--ease) both; }
+.site .type-dialog::backdrop { background: rgb(2 5 18 / 0.7); }
+.site .type-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.site .type-dialog-head h3 { font: 650 16px/1.3 var(--display); }
+.site .demo.embedded { padding: 0; background: none; box-shadow: none; }
+.site .demo.embedded .demo-float { display: none; }
+@media (max-width: 640px) { .site button.type-card { text-align: center; } }

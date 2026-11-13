@@ -5,7 +5,7 @@ import { BRAND } from "@/lib/brand";
 import { getPublicPlans, getSite } from "@/lib/site";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { checkoutConfigured } from "@/lib/payments";
-import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
+import { LiveDemo, SwapDemo, TypeGrid } from "@/components/SiteDemo";
 import AgentTool from "@/components/AgentTool";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { QR_TYPES } from "@/lib/qr-types";
@@ -111,17 +111,7 @@ export default async function Home() {
             <h2 className="display">Every kind of QR code, in one generator</h2>
             <p>Make link, text, Wi-Fi, contact, book and question QR codes, and point a code at any image, PDF, video or page.</p>
           </div>
-          <div className="type-grid">
-            {QR_TYPES.map((type) => (
-              <Link href="/register" className="type-card" key={type.name}>
-                <span className="page-icon" style={tone(type.tone)}>
-                  <type.icon size={18} />
-                </span>
-                <h3>{type.name}</h3>
-                <p>{type.text}</p>
-              </Link>
-            ))}
-          </div>
+          <TypeGrid />
         </section>
 
         {site.show.features && (

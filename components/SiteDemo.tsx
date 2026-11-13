@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, Lock, QrCode } from "lucide-react";
+import { ArrowRight, Download, Lock, QrCode, X } from "lucide-react";
 import { buildVCardPayload, buildWifiPayload } from "@/lib/qr-payload";
 import { QR_TYPES } from "@/lib/qr-types";
 
@@ -26,8 +26,8 @@ function payloadOf(kind: (typeof kinds)[number], v: Record<string, string>) {
 }
 
 /** A real generator on the home page: what you type is the code you see, and one code can be downloaded free. */
-export function LiveDemo() {
-  const [kind, setKind] = useState(kinds[0]);
+export function LiveDemo({ initial, embedded }: { initial?: string; embedded?: boolean } = {}) {
+  const [kind, setKind] = useState(kinds.find((item) => item.id === initial) || kinds[0]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [path, setPath] = useState({ d: "", size: 29 });
   const [state, setState] = useState<{ kind: "idle" | "busy" | "done" | "used" | "error"; text?: string }>({ kind: "idle" });
@@ -86,7 +86,7 @@ export function LiveDemo() {
   }
 
   return (
-    <div className="demo" id="free-qr" style={{ "--tone": kind.tone } as React.CSSProperties}>
+    <div className={`demo ${embedded ? "embedded" : ""}`} id={embedded ? undefined : "free-qr"} style={{ "--tone": kind.tone } as React.CSSProperties}>
       <span className="demo-float a">
         <i /> 1 QR code free, no sign-up
       </span>
@@ -180,5 +180,54 @@ export function SwapDemo() {
         <small>edit any time</small>
       </div>
     </div>
+  );
+}
+
+/** The QR type cards. A card opens the free generator for that type in a popup, without leaving the page. */
+export function TypeGrid() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState<(typeof QR_TYPES)[number] | null>(null);
+  useEffect(() => {
+    if (open && !dialog.current?.open) dialog.current?.showModal();
+  }, [open]);
+  const single = open && open.base !== "books" && open.base !== "csv";
+  return (
+    <>
+      <div className="type-grid">
+        {QR_TYPES.map((type) => (
+          <button type="button" className="type-card" key={type.id} onClick={() => setOpen(type)}>
+            <span className="page-icon" style={{ "--tone": type.tone } as React.CSSProperties}>
+              <type.icon size={18} />
+            </span>
+            <h3>{type.name}</h3>
+            <p>{type.text}</p>
+          </button>
+        ))}
+      </div>
+      {/* Native dialog: focus is trapped and Esc closes it without extra code. A click on the backdrop closes it too. */}
+      <dialog ref={dialog} className="type-dialog" aria-label={open?.name} onClose={() => setOpen(null)} onClick={(event) => event.target === dialog.current && dialog.current?.close()}>
+        {open && (
+          <>
+            <div className="type-dialog-head">
+              <h3>{open.name}</h3>
+              <button type="button" className="icon-button" aria-label="Close" onClick={() => dialog.current?.close()}>
+                <X size={18} />
+              </button>
+            </div>
+            {single ? (
+              <LiveDemo key={open.id} initial={open.id} embedded />
+            ) : (
+              <div className="stack">
+                <p>{open.text}</p>
+                <p className="muted">This tool makes many codes at once, so it needs a free account.</p>
+                <Link href="/register" className="button primary" style={{ justifySelf: "start" }}>
+                  Create free account <ArrowRight size={14} />
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+      </dialog>
+    </>
   );
 }

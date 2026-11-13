@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       throw new ApiError(409, USED);
     });
 
+    await rateLimit("free-qr:all", 3000, 86400);
     const visitorId = randomUUID();
     // Only links are kept. Wi-Fi passwords, contacts and private text never reach the database.
     await prisma.freeQrCredit.create({ data: { visitorId, type: tool.id, content: isLink ? data.content : null, ipHash: digest(ip) } });
