@@ -27,6 +27,6 @@ for (const entry of entries) {
 }
 await writeFile(
   join(destination, "RELEASE-NOTES.txt"),
-  "QR Manager. Run npm ci, set the environment from .env.example, then npm run build and npm start. See docs/DEPLOYMENT.md.\n",
+  "QR Code Generator. Run npm ci, set the environment from .env.example, then npm run build and npm start. See docs/DEPLOYMENT.md.\n",
 );
 console.log(destination);

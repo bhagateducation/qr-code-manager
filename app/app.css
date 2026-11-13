@@ -1,4 +1,4 @@
-/* QR Manager design system — "white studio".
+/* QR Code Generator design system — "white studio".
    White work surface, one brand colour for actions, and a fixed hue per module so a
    colour always means the same place. Everything reads from tokens; dark mode and the
    accent themes only redefine tokens. */
@@ -911,3 +911,17 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
   .site .info-grid { grid-template-columns: minmax(0, 1fr); }
   .site .info-card { justify-items: center; text-align: center; }
 }
+
+/* ───── QR types grid ───── */
+.site .type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.site .type-card { display: grid; gap: 8px; align-content: start; padding: 18px; border-radius: 16px; background: rgb(255 255 255 / 0.04); border: 1px solid var(--line); color: var(--ink); text-decoration: none; transition: transform 0.35s var(--ease), border-color 0.25s, background 0.25s; }
+.site .type-card:hover { transform: translateY(-4px); border-color: rgb(47 123 255 / 0.5); background: rgb(47 123 255 / 0.08); text-decoration: none; }
+.site .type-card .page-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; }
+.site .type-card h3 { font: 650 14px/1.3 var(--display); }
+.site .type-card p { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+@media (max-width: 960px) { .site .type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .site .type-grid { grid-template-columns: minmax(0, 1fr); }
+  .site .type-card { justify-items: center; text-align: center; }
+}
+@media (max-width: 400px) { .site .site-nav .brand { font-size: 13.5px; gap: 8px; } .site .site-menu > nav a { justify-content: flex-start; } }

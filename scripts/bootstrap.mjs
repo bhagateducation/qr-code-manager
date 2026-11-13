@@ -23,12 +23,12 @@ try {
         passwordHash: await bcrypt.hash(password, 12),
         workspace: {
           create: {
-            name: "QR Manager Studio",
+            name: "QR Code Generator Studio",
             slug: `owner-${randomBytes(8).toString("hex")}`,
             qrCodes: {
               create: [
                 {
-                  title: "Sample — QR Manager website",
+                  title: "Sample — QR Code Generator website",
                   shortCode: randomBytes(9).toString("base64url"),
                   targetUrl: process.env.APP_URL,
                   styling: {

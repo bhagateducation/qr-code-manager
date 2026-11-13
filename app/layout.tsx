@@ -10,7 +10,7 @@ import { getSiteOrigin } from "@/lib/site-origin";
 export const metadata: Metadata = {
   metadataBase: getSiteOrigin(),
   robots: { index: false, follow: true },
-  title: { default: `${BRAND} — Dynamic QR codes for your business`, template: `%s | ${BRAND}` },
+  title: { default: `${BRAND} — Free Link, Text, Wi-Fi, Image & Book QR Codes`, template: `%s | ${BRAND}` },
   description:
     "Create dynamic QR codes, manage structured business records, and measure scan activity in one workspace.",
 };

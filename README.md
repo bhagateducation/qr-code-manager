@@ -1,4 +1,4 @@
-# QR Manager
+# QR Code Generator
 
 A multi-tenant QR code SaaS: numbered dynamic QR codes with search, bulk actions and a 30-day trash, custom business records with public pages, scan analytics, teams, API keys, webhooks and Razorpay billing. Built with Next.js (App Router), React, TypeScript, Prisma and MySQL.
 

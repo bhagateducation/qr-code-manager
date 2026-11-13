@@ -1,4 +1,4 @@
-# QR Manager user guide
+# QR Code Generator user guide
 
 ## For a customer
 

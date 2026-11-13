@@ -8,6 +8,7 @@ import { checkoutConfigured } from "@/lib/payments";
 import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
 import AgentTool from "@/components/AgentTool";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
+import { QR_TYPES } from "@/lib/qr-types";
 import { COMPANY, CONTACT_EMAIL, COMPANY_URL, PROFILES, DESCRIPTION } from "@/lib/public-discovery";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
@@ -15,7 +16,7 @@ const week = [38, 52, 44, 71, 63, 88, 100];
 // The page is rebuilt at most once a minute, and straight away when the owner saves it in the panel.
 export const revalidate = 60;
 
-const title = `${BRAND} — Dynamic QR codes for your business`;
+const title = `${BRAND} — Free Link, Text, Wi-Fi, Image & Book QR Codes`;
 const description = DESCRIPTION;
 const siteOrigin = getSiteOrigin();
 
@@ -47,6 +48,7 @@ export default async function Home() {
         publisher: { "@id": new URL("#organization", siteOrigin).href } },
       { "@type": "SoftwareApplication", name: BRAND, url: siteOrigin.href,
         description, applicationCategory: "BusinessApplication", operatingSystem: "Web",
+        featureList: QR_TYPES.map((type) => type.name),
         publisher: { "@id": new URL("#organization", siteOrigin).href } },
       ...(site.show.faq && site.faq.length ? [{
         "@type": "FAQPage", mainEntity: site.faq.map(({ q, a }) => ({
@@ -199,6 +201,24 @@ export default async function Home() {
           </div>
         </section>
         )}
+
+        <section id="qr-types" className="site-section">
+          <div className="section-intro">
+            <h2 className="display">Every kind of QR code, in one generator</h2>
+            <p>Make link, text, Wi-Fi, contact, book and question QR codes, and point a code at any image, PDF, video or page.</p>
+          </div>
+          <div className="type-grid">
+            {QR_TYPES.map((type) => (
+              <Link href="/register" className="type-card" key={type.name}>
+                <span className="page-icon" style={tone(type.tone)}>
+                  <type.icon size={18} />
+                </span>
+                <h3>{type.name}</h3>
+                <p>{type.text}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
 
         {site.show.steps && (
         <section id="how-it-works" className="site-section">

@@ -22,6 +22,7 @@ export function SiteHeader({ show, home = false }: { show: Site["show"]; home?: 
           </Link>
           <nav aria-label="Main">
             {show.features && <a href={`${base}#features`}>Features</a>}
+            <a href={`${base}#qr-types`}>QR types</a>
             {show.steps && <a href={`${base}#how-it-works`}>How it works</a>}
             {show.pricing && <a href={`${base}#pricing`}>Pricing</a>}
             {show.faq && <a href={`${base}#faq`}>FAQ</a>}
@@ -37,6 +38,7 @@ export function SiteHeader({ show, home = false }: { show: Site["show"]; home?: 
               </summary>
               <nav aria-label="Mobile">
                 {show.features && <a href={`${base}#features`}>Features</a>}
+                <a href={`${base}#qr-types`}>QR types</a>
                 {show.steps && <a href={`${base}#how-it-works`}>How it works</a>}
                 {show.pricing && <a href={`${base}#pricing`}>Pricing</a>}
                 {show.faq && <a href={`${base}#faq`}>FAQ</a>}

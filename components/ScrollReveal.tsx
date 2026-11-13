@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const TARGETS = ".section-intro, .tile, .step, .plan, .safe-point, .faq details, .cta, .info-card";
+const TARGETS = ".section-intro, .tile, .step, .plan, .safe-point, .faq details, .cta, .info-card, .type-card";
 
 /** Fades sections in as they scroll into view. One observer, CSS does the animation. */
 export default function ScrollReveal() {

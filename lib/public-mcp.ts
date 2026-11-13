@@ -10,7 +10,7 @@ export const serverCard = {
   version: "1.0",
   protocolVersion,
   serverInfo,
-  description: "Public information about QR Manager.",
+  description: "Public information about QR Code Generator.",
   transport: { type: "streamable-http", endpoint: "/mcp" },
   capabilities,
   authentication: { required: false },

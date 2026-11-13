@@ -1,4 +1,4 @@
-# QR Manager deployment runbook
+# QR Code Generator deployment runbook
 
 Status: version 2.1.0 (branch `claude/redesign-commercial`) is live on the temporary Hostinger origin below, and Hostinger rebuilds it on every push to that branch. Keep the original static demo backup separate and never upload the old root `qr-code-manager-hostinger.zip`.
 

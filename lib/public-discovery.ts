@@ -9,7 +9,7 @@ export const PROFILES = ["https://github.com/bhagateducation"];
 
 export const publicInfoTool = {
   name: "get_qr_manager_info",
-  description: "Read the public overview, product capabilities, and official links for QR Manager.",
+  description: "Read the public overview, product capabilities, and official links for QR Code Generator.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true, openWorldHint: false },
 };
