@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Menu, QrCode, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import type { Site } from "@/lib/site";
-import { CONTACT_EMAIL } from "@/lib/public-discovery";
 import ScrollReveal from "@/components/ScrollReveal";
 
 /** Header shared by the public pages. On sub-pages the section links point back to the home page. */
@@ -29,7 +28,6 @@ export function SiteHeader({ show, home = false }: { show: Site["show"]; home?: 
           </nav>
           <div className="row-actions" style={{ flexWrap: "nowrap" }}>
             <Link href="/login" className="button">Sign in</Link>
-            <Link href="/register" className="button primary">Start free</Link>
             {/* Phone menu: a native <details>, so it opens even before JavaScript loads. */}
             <details className="site-menu">
               <summary aria-label="Menu">
@@ -62,7 +60,6 @@ export function SiteFooter() {
       <span className="row-actions">
         <Link href="/about">About</Link>
         <Link href="/contact">Contact</Link>
-        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         <Link href="/login">Sign in</Link>
         <Link href="/register">Create account</Link>
       </span>

@@ -925,3 +925,12 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
   .site .type-card { justify-items: center; text-align: center; }
 }
 @media (max-width: 400px) { .site .site-nav .brand { font-size: 13.5px; gap: 8px; } .site .site-menu > nav a { justify-content: flex-start; } }
+
+/* Sidebar groups open and close; their items sit slightly indented as a submenu. */
+button.nav-group { display: flex; align-items: center; justify-content: space-between; width: calc(100% - 16px); min-height: 30px; padding: 0 6px; border-radius: var(--r-s); cursor: pointer; transition: color 0.15s, background 0.15s; }
+button.nav-group:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 5%, transparent); }
+button.nav-group svg { transition: transform 0.2s var(--ease); }
+button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.nav-item.nav-sub { width: calc(100% - 10px); margin-left: 10px; }
+/* Launch header: without Start free the full product name fits on phones. */
+.site .site-nav .brand { white-space: nowrap; }

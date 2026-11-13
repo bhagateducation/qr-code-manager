@@ -32,8 +32,10 @@ import {
   UserPlus,
   Users,
   X,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
+import { QR_TYPES, type QrTool } from "@/lib/qr-types";
 import { BRAND } from "@/lib/brand";
 import { api, Ctx, Data, Filters, Info, Modal, QR, ThemeControl, formatDate, noFilters, viewMotion } from "./ui";
 import Overview from "./Overview";
@@ -56,11 +58,11 @@ const Website = dynamic(() => import("./Owner").then((module) => module.Website)
 // Each module owns one hue, used for its icon everywhere it appears.
 const navigation: { id: string; label: string; icon: LucideIcon; tone: string; group: string; hint: string; help: string; platform?: boolean; account?: boolean }[] = [
   { id: "overview", label: "Home", icon: Home, tone: "var(--brand)", group: "", hint: "Your workspace at a glance", help: "A summary of this panel: scans this week, your most scanned codes, what your plan allows and how much storage is used." },
-  { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "", hint: "Create, find, copy and download your codes", help: "Every code has a number such as QR-00042. Open folders by clicking them, search by number, name or link, and tick several codes to pause, move or trash them together. Changing a website code's link never changes its image." },
-  { id: "books", label: "Book QR", icon: BookOpen, tone: "var(--c-orange)", group: "", hint: "A QR code for every question of a book, sorted by chapter", help: "For books and question banks. Enter the book's name, a link pattern and how many questions each chapter has; one click makes a folder per chapter and a numbered QR for every question." },
-  { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "", hint: "Scans, devices and busiest times", help: "How often your codes are scanned, from which kinds of phone, and at what times. Choose a period at the top; export every scan as CSV." },
-  { id: "systems", label: "Systems & records", icon: Layers, tone: "var(--c-violet)", group: "Organise", hint: "Your own tables, with a public page per record", help: "Make your own table (a system), such as Products or Students, with the fields you need. Publish a record to get a public page, then point a QR code at it." },
-  { id: "tags", label: "Tags", icon: Tag, tone: "var(--c-amber)", group: "Organise", hint: "Colour labels for sorting codes", help: "Tags are coloured labels that work across folders, like Print or Urgent. Add them to codes in the editor and filter the list by them." },
+  { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "Manage", hint: "Create, find, copy and download your codes", help: "Every code has a number such as QR-00042. Open folders by clicking them, search by number, name or link, and tick several codes to pause, move or trash them together. Changing a website code's link never changes its image." },
+  { id: "books", label: "Book QR", icon: BookOpen, tone: "var(--c-orange)", group: "Create QR", hint: "A QR code for every question of a book, sorted by chapter", help: "For books and question banks. Enter the book's name, a link pattern and how many questions each chapter has; one click makes a folder per chapter and a numbered QR for every question." },
+  { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "Manage", hint: "Scans, devices and busiest times", help: "How often your codes are scanned, from which kinds of phone, and at what times. Choose a period at the top; export every scan as CSV." },
+  { id: "systems", label: "Systems & records", icon: Layers, tone: "var(--c-violet)", group: "Manage", hint: "Your own tables, with a public page per record", help: "Make your own table (a system), such as Products or Students, with the fields you need. Publish a record to get a public page, then point a QR code at it." },
+  { id: "tags", label: "Tags", icon: Tag, tone: "var(--c-amber)", group: "Manage", hint: "Colour labels for sorting codes", help: "Tags are coloured labels that work across folders, like Print or Urgent. Add them to codes in the editor and filter the list by them." },
   { id: "webhooks", label: "Webhooks", icon: Code2, tone: "var(--c-teal)", group: "Developers", hint: "Get a signed event on every scan", help: "For developers: we send a signed message to your server each time one of your codes is scanned." },
   { id: "apiKeys", label: "API keys", icon: KeyRound, tone: "var(--c-orange)", group: "Developers", hint: "Create and list codes from your own software", help: "For developers: a key lets your own software create and list codes in this panel." },
   { id: "team", label: "Team", icon: Users, tone: "var(--c-sky)", group: "Workspace", hint: "Members, roles and invitations", help: "Invite people to this panel. Admins manage almost everything, editors create and change codes, viewers can only look and download." },
@@ -84,6 +86,8 @@ export default function Dashboard() {
     [loadError, setLoadError] = useState(""),
     [drawer, setDrawer] = useState(false),
     [editing, setEditing] = useState<QR | null | undefined>(undefined),
+    [tool, setTool] = useState<QrTool | undefined>(undefined),
+    [openGroups, setOpenGroups] = useState<Record<string, boolean>>({}),
     [page, setPage] = useState(1),
     [filters, setFilters] = useState<Filters>(noFilters),
     [toasts, setToasts] = useState<Toast[]>([]),
@@ -150,7 +154,17 @@ export default function Dashboard() {
   const openStudio = useCallback(
     (qr: QR | null) => {
       go("codes");
+      setTool(undefined);
       setEditing(qr);
+    },
+    [go],
+  );
+  // A sidebar tool opens the studio set up for that kind of code; books and CSV have their own screens.
+  const openTool = useCallback(
+    (next: QrTool) => {
+      go(next.base === "books" ? "books" : "codes");
+      setTool(next);
+      if (next.base !== "books" && next.base !== "csv") setEditing(null);
     },
     [go],
   );
@@ -323,19 +337,44 @@ export default function Dashboard() {
             <kbd>Ctrl K</kbd>
           </button>
           <nav>
-            {items.map((item, index) => (
-              <div key={item.id}>
-                {item.group && items[index - 1]?.group !== item.group && <div className="nav-group">{item.group}</div>}
-                <button className="nav-item" aria-current={view === item.id ? "page" : undefined} onClick={() => go(item.id)}>
-                  {view === item.id && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: "spring", stiffness: 520, damping: 40 }} />}
-                  <span className="nav-ico" style={toneStyle(item.tone)}>
-                    <item.icon size={15} />
-                  </span>
-                  <span className="grow truncate">{item.label}</span>
-                  {item.id === "codes" && <span className="nav-count">{data.codeCount.toLocaleString()}</span>}
-                </button>
-              </div>
-            ))}
+            {["", "Create QR", "Manage", "Developers", "Workspace", "Platform"].map((group) => {
+              const members = items.filter((item) => item.group === group && item.id !== "books");
+              if (!members.length && group !== "Create QR") return null;
+              // The group holding the open page starts expanded; a click on the heading shows or hides it.
+              const holdsCurrent = group === "Create QR" ? view === "books" || (view === "codes" && editing === null && !!tool) : members.some((item) => item.id === view);
+              const open = !group || (openGroups[group] ?? holdsCurrent);
+              return (
+                <div key={group || "top"}>
+                  {group && (
+                    <button className="nav-group" aria-expanded={open} onClick={() => setOpenGroups((state) => ({ ...state, [group]: !open }))}>
+                      {group}
+                      <ChevronDown size={14} />
+                    </button>
+                  )}
+                  {open &&
+                    group === "Create QR" &&
+                    QR_TYPES.map((item) => (
+                      <button className="nav-item nav-sub" key={item.id} aria-current={tool?.id === item.id && holdsCurrent ? "page" : undefined} onClick={() => openTool(item)}>
+                        <span className="nav-ico" style={toneStyle(item.tone)}>
+                          <item.icon size={15} />
+                        </span>
+                        <span className="grow truncate">{item.name.replace(/ QR Codes?$| to QR Code$/, "")}</span>
+                      </button>
+                    ))}
+                  {open &&
+                    members.map((item) => (
+                      <button className={`nav-item ${group ? "nav-sub" : ""}`} key={item.id} aria-current={view === item.id && !(item.id === "codes" && editing === null && tool) ? "page" : undefined} onClick={() => (setTool(undefined), go(item.id))}>
+                        {view === item.id && <motion.span layoutId="nav-pill" className="nav-pill" transition={{ type: "spring", stiffness: 520, damping: 40 }} />}
+                        <span className="nav-ico" style={toneStyle(item.tone)}>
+                          <item.icon size={15} />
+                        </span>
+                        <span className="grow truncate">{item.label}</span>
+                        {item.id === "codes" && <span className="nav-count">{data.codeCount.toLocaleString()}</span>}
+                      </button>
+                    ))}
+                </div>
+              );
+            })}
           </nav>
           <div className="side-foot">
             {data.limits.codes !== null && (
@@ -453,7 +492,7 @@ export default function Dashboard() {
                   {view === "overview" && <Overview ctx={ctx} openStudio={openStudio} />}
                   {view === "codes" &&
                     (editing !== undefined ? (
-                      <QRStudio key={editing?.id || "new"} ctx={ctx} qr={editing} defaultFolder={filters.folder === "none" ? "" : filters.folder} onClose={() => setEditing(undefined)} />
+                      <QRStudio key={editing?.id || `new-${tool?.id || ""}`} ctx={ctx} qr={editing} tool={tool} defaultFolder={filters.folder === "none" ? "" : filters.folder} onClose={() => setEditing(undefined)} />
                     ) : (
                       <QRCodes ctx={ctx} page={page} setPage={setPage} filters={filters} setFilters={setFilters} openStudio={openStudio} />
                     ))}
