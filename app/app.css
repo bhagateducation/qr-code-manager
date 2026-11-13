@@ -540,7 +540,9 @@ pre.snippet { margin: 0; padding: 12px 14px; border-radius: var(--r-s); backgrou
   table.cards td { padding: 3px 0; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   table.cards td[data-label]::before { content: attr(data-label); font-size: 12px; font-weight: 600; color: var(--ink-3); flex: none; }
   table.cards td:first-child::before, table.cards td.actions::before { content: none; }
-  table.cards td.actions { justify-content: flex-end; padding-top: 6px; }
+  table.cards td.actions { justify-content: flex-end; padding-top: 6px; flex-wrap: wrap; }
+  table.cards td.actions .row-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; justify-content: flex-end; }
+  table.cards td.actions .button.small .label { display: none; }
   .destination { max-width: 55vw; }
   .hero-copy .row-actions .button { flex: 1 1 100%; }
   .site-nav .button:not(.primary) { display: none; }
