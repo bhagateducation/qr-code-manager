@@ -1,27 +1,43 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Contact, Link2, QrCode, Wifi } from "lucide-react";
+import { ArrowRight, Download, QrCode } from "lucide-react";
+import { buildVCardPayload, buildWifiPayload } from "@/lib/qr-payload";
+import { QR_TYPES } from "@/lib/qr-types";
 
-const kinds = [
-  { id: "link", label: "Link", icon: Link2, tone: "var(--c-blue)", field: "Website address", start: "yourshop.com/menu", note: "In your workspace this becomes a dynamic code: change where it leads later without reprinting." },
-  { id: "wifi", label: "Wi-Fi", icon: Wifi, tone: "var(--c-teal)", field: "Network name", start: "Cafe Guest", note: "Guests scan and join. No more spelling out the password." },
-  { id: "card", label: "Contact", icon: Contact, tone: "var(--c-pink)", field: "Full name", start: "Asha Verma", note: "One scan saves your name, phone and email to their phone." },
-] as const;
-const payload = (kind: string, value: string) =>
-  kind === "wifi" ? `WIFI:T:nopass;S:${value};H:false;;` : kind === "card" ? `BEGIN:VCARD\nVERSION:3.0\nFN:${value}\nEND:VCARD` : /^https?:\/\//.test(value) ? value : `https://${value}`;
+// Every type that makes a single code. Book sets and CSV imports need an account.
+const kinds = QR_TYPES.filter((item) => item.base !== "books" && item.base !== "csv");
+const SAMPLE = "https://example.com";
+const fieldsOf = (kind: (typeof kinds)[number]) =>
+  kind.base === "wifi"
+    ? [{ key: "ssid", label: "Wi-Fi name", placeholder: "Cafe Guest" }, { key: "password", label: "Wi-Fi password", placeholder: "Leave empty if open" }]
+    : kind.base === "vcard"
+      ? [{ key: "name", label: "Full name", placeholder: "Asha Verma" }, { key: "phone", label: "Phone", placeholder: "+91 98765 43210" }, { key: "email", label: "Email", placeholder: "asha@example.com" }]
+      : kind.base === "text"
+        ? [{ key: "text", label: "Your text", placeholder: "Type a short message" }]
+        : kind.fields || [{ key: "url", label: kind.urlLabel || "Website address", placeholder: kind.placeholder || "yourshop.com/menu" }];
+function payloadOf(kind: (typeof kinds)[number], v: Record<string, string>) {
+  const get = (key: string) => (v[key] || "").trim();
+  if (kind.base === "wifi") return get("ssid") ? buildWifiPayload({ ssid: get("ssid"), password: get("password"), security: get("password") ? "WPA" : "nopass", hidden: false }) : "";
+  if (kind.base === "vcard") return get("name") ? buildVCardPayload({ name: get("name"), organization: "", phone: get("phone"), email: get("email"), url: "" }) : "";
+  if (kind.base === "text") return get("text");
+  if (kind.build) return kind.build(v);
+  return get("url") ? (/^https?:\/\//i.test(get("url")) ? get("url") : `https://${get("url")}`) : "";
+}
 
-/** A real generator on the home page: what you type is the code you see. */
+/** A real generator on the home page: what you type is the code you see, and one code can be downloaded free. */
 export function LiveDemo() {
-  const [kind, setKind] = useState<(typeof kinds)[number]>(kinds[0]);
-  const [value, setValue] = useState<string>(kinds[0].start);
+  const [kind, setKind] = useState(kinds[0]);
+  const [values, setValues] = useState<Record<string, string>>({});
   const [path, setPath] = useState({ d: "", size: 29 });
+  const [state, setState] = useState<{ kind: "idle" | "busy" | "done" | "used" | "error"; text?: string }>({ kind: "idle" });
+  const payload = payloadOf(kind, values);
   useEffect(() => {
     let active = true;
     import("qrcode").then(({ default: QRCode }) => {
       if (!active) return;
       try {
-        const { modules } = QRCode.create(payload(kind.id, value.trim() || kind.start), { errorCorrectionLevel: "M" });
+        const { modules } = QRCode.create(payload || SAMPLE, { errorCorrectionLevel: "M" });
         let d = "";
         for (let y = 0; y < modules.size; y++) for (let x = 0; x < modules.size; x++) if (modules.get(y, x)) d += `M${x} ${y}h1v1h-1z`;
         setPath({ d, size: modules.size });
@@ -32,34 +48,61 @@ export function LiveDemo() {
     return () => {
       active = false;
     };
-  }, [kind, value]);
+  }, [payload]);
+
+  async function download() {
+    if (!payload) return setState({ kind: "error", text: "Fill in the details first." });
+    setState({ kind: "busy" });
+    try {
+      // The server records the visitor's one free code; only then is the image saved.
+      const response = await fetch("/api/free-qr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: kind.id, content: payload }) });
+      if (!response.ok) {
+        const text = ((await response.json().catch(() => null)) as { error?: string } | null)?.error || "Something went wrong. Please try again.";
+        return setState({ kind: response.status === 409 ? "used" : "error", text });
+      }
+      const { default: QRCode } = await import("qrcode");
+      const link = document.createElement("a");
+      link.href = await QRCode.toDataURL(payload, { width: 1024, margin: 4, errorCorrectionLevel: "M" });
+      link.download = `${kind.id}-qr-code.png`;
+      link.click();
+      setState({ kind: "done" });
+    } catch {
+      setState({ kind: "error", text: "Something went wrong. Please try again." });
+    }
+  }
+
   return (
-    <div className="demo" style={{ "--tone": kind.tone } as React.CSSProperties}>
+    <div className="demo" id="free-qr" style={{ "--tone": kind.tone } as React.CSSProperties}>
       <span className="demo-float a">
-        <i /> Scan-tested before download
+        <i /> 1 QR code free, no sign-up
       </span>
-      <div className="demo-tabs" role="group" aria-label="Code type">
-        {kinds.map((item) => (
-          <button
-            key={item.id}
-            aria-pressed={kind.id === item.id}
-            onClick={() => {
-              setKind(item);
-              setValue(item.start);
-            }}
-          >
-            <item.icon size={15} /> {item.label}
-          </button>
-        ))}
-      </div>
       <label>
-        {kind.field}
-        <input value={value} maxLength={120} onChange={(event) => setValue(event.target.value)} spellCheck={false} autoComplete="off" />
+        QR type
+        <select
+          value={kind.id}
+          onChange={(event) => {
+            setKind(kinds.find((item) => item.id === event.target.value) || kinds[0]);
+            setValues({});
+            setState({ kind: "idle" });
+          }}
+        >
+          {kinds.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
       </label>
+      {fieldsOf(kind).map((field) => (
+        <label key={`${kind.id}-${field.key}`}>
+          {field.label}
+          <input value={values[field.key] || ""} placeholder={field.placeholder} maxLength={300} onChange={(event) => setValues({ ...values, [field.key]: event.target.value })} spellCheck={false} autoComplete="off" />
+        </label>
+      ))}
       <div className="demo-stage">
         <div className="demo-qr">
           {path.d ? (
-            <svg viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`QR code for ${value}`} shapeRendering="crispEdges">
+            <svg viewBox={`-2 -2 ${path.size + 4} ${path.size + 4}`} role="img" aria-label={`${kind.name} preview`} shapeRendering="crispEdges">
               <path d={path.d} fill="#15161a" />
             </svg>
           ) : (
@@ -67,16 +110,23 @@ export function LiveDemo() {
           )}
         </div>
         <div className="demo-side">
-          <strong>Try it. This code is real.</strong>
-          <p>{kind.note}</p>
-          <Link href="/register" className="button primary small" style={{ justifySelf: "start" }}>
-            Save and download <ArrowRight size={14} />
-          </Link>
+          <strong>{state.kind === "done" ? "Downloaded." : "Make 1 QR code free."}</strong>
+          <p role="status">
+            {state.kind === "done"
+              ? "This free code cannot be edited later. Create a free account to change links after printing and see scans."
+              : state.text || "No account needed. Pick a type, fill it in and download the PNG."}
+          </p>
+          {state.kind === "done" || state.kind === "used" ? (
+            <Link href="/register" className="button primary small" style={{ justifySelf: "start" }}>
+              Create free account <ArrowRight size={14} />
+            </Link>
+          ) : (
+            <button type="button" className="button primary small" style={{ justifySelf: "start" }} disabled={state.kind === "busy"} onClick={download}>
+              <Download size={14} /> {state.kind === "busy" ? "Preparing…" : "Download free QR"}
+            </button>
+          )}
         </div>
       </div>
-      <span className="demo-float b">
-        <QrCode size={14} /> QR-00042 · Summer menu
-      </span>
     </div>
   );
 }

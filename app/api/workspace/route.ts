@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
           throw new ApiError(404, "One or more tags were not found.");
         if (input.action === "qr.create") {
           const now = await usage(tx, ids);
-          if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached.");
+          if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached. Upgrade your plan under Plan & billing to make more.");
           requireStorage(quota, now.storageBytes, 600);
           // The workspace row is locked by this transaction, so numbers never repeat or skip under load.
           const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
@@ -615,7 +615,7 @@ export async function POST(request: NextRequest) {
         const source = await tx.qRCode.findFirst({ where: { id: input.id, workspaceId, deletedAt: null }, include: { tags: true } });
         if (!source) throw new ApiError(404, "QR not found.");
         const now = await usage(tx, ids);
-        if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached.");
+        if (over(quota.codes, now.codes)) throw new ApiError(409, "Your plan QR limit has been reached. Upgrade your plan under Plan & billing to make more.");
         requireStorage(quota, now.storageBytes, 600);
         const { qrSeq } = await tx.workspace.update({ where: { id: workspaceId }, data: { qrSeq: { increment: 1 } } });
         entity = await tx.qRCode.create({

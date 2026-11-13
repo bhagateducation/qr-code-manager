@@ -1,9 +1,9 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Bell, Building2, Check, ExternalLink, Gem, LogIn, Plus, Search, Trash2, X } from "lucide-react";
+import { Bell, Building2, Check, Download, ExternalLink, Gem, LogIn, Plus, Search, Trash2, X } from "lucide-react";
 import { Meter } from "./Overview";
-import { Ctx, Drive, Empty, Info, Limits, Modal, Plan, api, formatBytes, formatDate, formatDateTime, limitText, rupees } from "./ui";
+import { Ctx, Drive, Empty, Info, Limits, Modal, Plan, api, formatBytes, formatDate, formatDateTime, limitText, rupees, saveFile } from "./ui";
 
 type Client = {
   id: string;
@@ -30,6 +30,7 @@ type Report = {
   totals: Record<string, number>;
   maintenanceRun: string | null;
   site: Site;
+  freeCredits: { total: number; recent: { id: string; type: string; content: string | null; createdAt: string }[] };
 };
 type Site = {
   heroLine1: string;
@@ -104,6 +105,13 @@ export function Clients({ ctx }: { ctx: Ctx }) {
   if (!report) return <div className="skeleton" style={{ height: 320 }} />;
   const client = report.clients.find((item) => item.id === open);
   const t = report.totals;
+  // Two separate lists: people who pay now, and signed-up people on the free plan (or whose plan ended).
+  const exportEmails = (paid: boolean) => {
+    const rows = report.clients.filter((item) => !item.isPlatform && item.owner && (item.status === "active" || item.status === "expiring") === paid);
+    const cell = (value: string) => `"${value.replace(/"/g, '""').replace(/^[=+\-@]/, "'$&")}"`;
+    saveFile(`${paid ? "subscribers" : "free-users"}.csv`, ["Name,Email,Account,Status,Signed up", ...rows.map((item) => [item.owner!.name, item.owner!.email, item.name, statusLabel[item.status], item.createdAt.slice(0, 10)].map(cell).join(","))].join("\n"), "text/csv");
+    notify(`${rows.length} ${paid ? "subscribers" : "free users"} exported.`);
+  };
   return (
     <div className="page-stack">
       <div className="stats-grid">
@@ -119,6 +127,35 @@ export function Clients({ ctx }: { ctx: Ctx }) {
             <small>{note}</small>
           </div>
         ))}
+      </div>
+      <div className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Free QR credits</h2>
+            <p className="muted">{report.freeCredits.total.toLocaleString()} free codes made on the website without an account (one per visitor). Only links are kept; Wi-Fi, contact and text details are never stored.</p>
+          </div>
+          <div className="row-actions">
+            <button className="button" onClick={() => exportEmails(false)}>
+              <Download size={15} /> Free users (CSV)
+            </button>
+            <button className="button" onClick={() => exportEmails(true)}>
+              <Download size={15} /> Subscribers (CSV)
+            </button>
+          </div>
+        </div>
+        {report.freeCredits.recent.length > 0 && (
+          <details>
+            <summary>Latest {report.freeCredits.recent.length} free codes</summary>
+            <ul className="details-content stack" style={{ gap: 6 }}>
+              {report.freeCredits.recent.map((item) => (
+                <li key={item.id} className="text-sm truncate">
+                  <span className="muted">{formatDateTime(item.createdAt)}</span> · <b>{item.type}</b>
+                  {item.content && <> · {item.content}</>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
       <div className="panel flush">
         <div className="toolbar">

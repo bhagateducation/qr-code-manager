@@ -20,7 +20,7 @@ export const LIMIT_KEYS = ["codes", "systems", "records", "storageMb", "panels",
 export const FEATURE_KEYS = ["allowApi", "allowBooks", "allowDomain"] as const;
 const UNLIMITED: Limits = { codes: null, systems: null, records: null, storageMb: null, panels: null, members: null, allowApi: true, allowBooks: true, allowDomain: true };
 // Used only if the plans table is somehow empty.
-const FALLBACK: Limits = { codes: 10, systems: 1, records: 50, storageMb: 1024, panels: 0, members: 3, allowApi: true, allowBooks: true, allowDomain: false };
+const FALLBACK: Limits = { codes: 1, systems: 1, records: 50, storageMb: 1024, panels: 0, members: 3, allowApi: false, allowBooks: false, allowDomain: false };
 
 const pick = (source: Record<string, unknown>): Partial<Limits> =>
   Object.fromEntries([...LIMIT_KEYS, ...FEATURE_KEYS].filter((key) => key in source).map((key) => [key, source[key]]));

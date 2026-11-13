@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   }),
 };
 
-const limitLine = (value: number | null, word: string) => `${value === null ? "Unlimited" : value.toLocaleString()} ${word}`;
+const limitLine = (value: number | null, word: string) => `${value === null ? "Unlimited" : value.toLocaleString()} ${value === 1 ? word.replace(/s$/, "") : word}`;
 
 export default async function Home() {
   const [site, plans] = await Promise.all([getSite(), getPublicPlans()]);
@@ -88,7 +88,7 @@ export default async function Home() {
             </div>
             <div className="hero-notes">
               <span>
-                <Check size={15} /> {free ? `${limitLine(free.codes, "codes")} free, forever` : "Free plan available"}
+                <Check size={15} /> {free ? `${limitLine(free.codes, "QR codes")} free, forever` : "Free plan available"}
               </span>
               <span>
                 <Check size={15} /> No card needed
