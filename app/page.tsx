@@ -8,7 +8,6 @@ import { checkoutConfigured } from "@/lib/payments";
 import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
 import AgentTool from "@/components/AgentTool";
 import { COMPANY, CONTACT_EMAIL, COMPANY_URL, TERMS_URL, PROFILES, DESCRIPTION } from "@/lib/public-discovery";
-import ThemeControl from "@/components/ThemeControl";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
 const week = [38, 52, 44, 71, 63, 88, 100];
@@ -80,7 +79,6 @@ export default async function Home() {
             <Link href="/login" className="site-mobile-signin">Sign in</Link>
           </nav>
           <div className="row-actions" style={{ flexWrap: "nowrap" }}>
-            <ThemeControl />
             <Link href="/login" className="button">
               Sign in
             </Link>
