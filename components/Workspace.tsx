@@ -427,7 +427,7 @@ export function SettingsPanel({ ctx }: { ctx: Ctx }) {
     }
   }
   return (
-    <div className="two-col" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+    <div className="two-col even">
       <div className="page-stack">
         <form
           className="panel stack"
