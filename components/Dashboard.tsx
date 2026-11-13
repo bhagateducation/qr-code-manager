@@ -58,9 +58,9 @@ const Website = dynamic(() => import("./Owner").then((module) => module.Website)
 // Each module owns one hue, used for its icon everywhere it appears.
 const navigation: { id: string; label: string; icon: LucideIcon; tone: string; group: string; hint: string; help: string; platform?: boolean; account?: boolean }[] = [
   { id: "overview", label: "Home", icon: Home, tone: "var(--brand)", group: "", hint: "Your workspace at a glance", help: "A summary of this panel: scans this week, your most scanned codes, what your plan allows and how much storage is used." },
-  { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "Manage", hint: "Create, find, copy and download your codes", help: "Every code has a number such as QR-00042. Open folders by clicking them, search by number, name or link, and tick several codes to pause, move or trash them together. Changing a website code's link never changes its image." },
+  { id: "codes", label: "QR codes", icon: QrCode, tone: "var(--c-blue)", group: "", hint: "Create, find, copy and download your codes", help: "Every code has a number such as QR-00042. Open folders by clicking them, search by number, name or link, and tick several codes to pause, move or trash them together. Changing a website code's link never changes its image." },
   { id: "books", label: "Book QR", icon: BookOpen, tone: "var(--c-orange)", group: "Create QR", hint: "A QR code for every question of a book, sorted by chapter", help: "For books and question banks. Enter the book's name, a link pattern and how many questions each chapter has; one click makes a folder per chapter and a numbered QR for every question." },
-  { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "Manage", hint: "Scans, devices and busiest times", help: "How often your codes are scanned, from which kinds of phone, and at what times. Choose a period at the top; export every scan as CSV." },
+  { id: "analytics", label: "Analytics", icon: BarChart3, tone: "var(--c-green)", group: "", hint: "Scans, devices and busiest times", help: "How often your codes are scanned, from which kinds of phone, and at what times. Choose a period at the top; export every scan as CSV." },
   { id: "systems", label: "Systems & records", icon: Layers, tone: "var(--c-violet)", group: "Manage", hint: "Your own tables, with a public page per record", help: "Make your own table (a system), such as Products or Students, with the fields you need. Publish a record to get a public page, then point a QR code at it." },
   { id: "tags", label: "Tags", icon: Tag, tone: "var(--c-amber)", group: "Manage", hint: "Colour labels for sorting codes", help: "Tags are coloured labels that work across folders, like Print or Urgent. Add them to codes in the editor and filter the list by them." },
   { id: "webhooks", label: "Webhooks", icon: Code2, tone: "var(--c-teal)", group: "Developers", hint: "Get a signed event on every scan", help: "For developers: we send a signed message to your server each time one of your codes is scanned." },
@@ -347,13 +347,12 @@ export default function Dashboard() {
                 <div key={group || "top"}>
                   {group && (
                     <button className="nav-group" aria-expanded={open} onClick={() => setOpenGroups((state) => ({ ...state, [group]: !open }))}>
-                      {group}
+                      {group === "Create QR" && !open ? "Create QR · show all" : group}
                       <ChevronDown size={14} />
                     </button>
                   )}
-                  {open &&
-                    group === "Create QR" &&
-                    QR_TYPES.map((item) => (
+                  {group === "Create QR" &&
+                    QR_TYPES.filter((item, index) => open || index < 5 || tool?.id === item.id).map((item) => (
                       <button className="nav-item nav-sub" key={item.id} aria-current={tool?.id === item.id && holdsCurrent ? "page" : undefined} onClick={() => openTool(item)}>
                         <span className="nav-ico" style={toneStyle(item.tone)}>
                           <item.icon size={15} />
