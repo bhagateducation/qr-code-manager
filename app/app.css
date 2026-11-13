@@ -740,11 +740,6 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 .side-resize:hover, .side-resize:active { background: color-mix(in srgb, var(--brand) 35%, transparent); }
 @media (min-width: 961px) {
   .app.mini { grid-template-columns: 64px minmax(0, 1fr); }
-  .app.mini .side { width: 64px; z-index: 75; overflow-x: hidden; transition: width 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .app.mini .side:is(:hover, :has(:focus-visible)) { width: var(--side-w); box-shadow: var(--shadow-3); }
-  .app.mini .side:not(:hover, :has(:focus-visible)) :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-plan, .panel-switch, .side-user .grow, .side-user > svg, .side-toggle) { display: none; }
-  .app.mini .side:not(:hover, :has(:focus-visible)) .nav-group { height: 1px; min-height: 0; width: auto; padding: 0; margin: 8px 6px; overflow: hidden; color: transparent; background: var(--line); }
-  .app.mini .side:not(:hover, :has(:focus-visible)) :is(.nav-item, .side-search) { justify-content: center; padding: 0; }
 }
 @media (max-width: 960px) {
   .side-toggle, .side-resize { display: none; }
@@ -769,8 +764,6 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 /* The page makes room for the menu: it narrows while the menu is open and widens again when it folds back to icons. */
 @media (min-width: 961px) {
   .app { transition: grid-template-columns 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .app.mini:has(> .side:is(:hover, :has(:focus-visible))) { grid-template-columns: var(--side-w) minmax(0, 1fr); }
-  .app.mini .side:is(:hover, :has(:focus-visible)) { box-shadow: none; }
 }
 /* Keep the demo box stable while the generated SVG replaces its placeholder. */
 .demo-qr { position: relative; min-width: 0; }
@@ -1061,3 +1054,18 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
   .app .content { max-width: none; }
   .app .side { will-change: width; }
 }
+/* Folded menu: the layout never changes between folded and open, so opening on hover is one smooth width change
+   (icons stay put, labels fade in). Hover opens over the page; the fold button resizes the page. */
+@media (min-width: 961px) {
+  .app.mini .side { width: 64px; z-index: 75; overflow: hidden; transition: width 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s; }
+  .app.mini .side:is(:hover, :has(:focus-visible)) { width: var(--side-w); box-shadow: var(--shadow-3); transition-delay: 0.12s; }
+  .app.mini .side :is(.nav-item, .side-search, .side-head, .side-user, .nav-group) { white-space: nowrap; }
+  .app.mini .side :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-user .grow, .side-user > svg, .side-toggle, .nav-group) { transition: opacity 0.14s; }
+  .app.mini .side:not(:hover, :has(:focus-visible)) :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-user .grow, .side-user > svg, .side-toggle, .nav-group) { opacity: 0; }
+  .app.mini .side:is(:hover, :has(:focus-visible)) :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-user .grow, .side-user > svg, .side-toggle, .nav-group) { transition-delay: 0.12s; }
+  .app.mini .side :is(.side-plan, .panel-switch) { display: none; }
+  .app.mini .side-search { padding: 0 13px; }
+  /* Sub-items line up with the other icons in the folded column. */
+  .app.mini .nav-item.nav-sub { width: 100%; margin-left: 0; }
+}
+
