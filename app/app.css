@@ -763,7 +763,7 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 }
 /* The page makes room for the menu: it narrows while the menu is open and widens again when it folds back to icons. */
 @media (min-width: 961px) {
-  .app { transition: grid-template-columns 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .app { transition: grid-template-columns 0.22s cubic-bezier(0.25, 0.8, 0.25, 1); }
 }
 /* Keep the demo box stable while the generated SVG replaces its placeholder. */
 .demo-qr { position: relative; min-width: 0; }
@@ -1057,8 +1057,9 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
 /* Folded menu: the layout never changes between folded and open, so opening on hover is one smooth width change
    (icons stay put, labels fade in). Hover opens over the page; the fold button resizes the page. */
 @media (min-width: 961px) {
-  .app.mini .side { width: 64px; z-index: 75; overflow: hidden; transition: width 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s; }
-  .app.mini .side:is(:hover, :has(:focus-visible)) { width: var(--side-w); box-shadow: var(--shadow-3); transition-delay: 0.12s; }
+  /* The menu fills its grid column, and only the column animates, so the menu and the page move as one. */
+  .app.mini .side { width: 100%; overflow: hidden; }
+  .app.mini:has(> .side:hover, > .side :focus-visible) { grid-template-columns: var(--side-w) minmax(0, 1fr); transition-delay: 0.1s; }
   .app.mini .side :is(.nav-item, .side-search, .side-head, .side-user, .nav-group) { white-space: nowrap; }
   .app.mini .side :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-user .grow, .side-user > svg, .side-toggle, .nav-group) { transition: opacity 0.14s; }
   .app.mini .side:not(:hover, :has(:focus-visible)) :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-user .grow, .side-user > svg, .side-toggle, .nav-group) { opacity: 0; }
@@ -1067,5 +1068,28 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
   .app.mini .side-search { padding: 0 13px; }
   /* Sub-items line up with the other icons in the folded column. */
   .app.mini .nav-item.nav-sub { width: 100%; margin-left: 0; }
+}
+
+/* Open effects: everything that appears slides and fades in quickly instead of popping. */
+@keyframes pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.98); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(6px); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes slide-down { from { opacity: 0; transform: translateY(-4px); } }
+.dropdown[open] > .menu-pop { animation: pop-in 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: top right; }
+.dropdown.left[open] > .menu-pop { transform-origin: top left; }
+.side nav .nav-sub { animation: slide-down 0.18s ease-out both; }
+.folder-tile { animation: fade-up 0.22s ease-out both; }
+.folder-tile:nth-child(2) { animation-delay: 0.03s; }
+.folder-tile:nth-child(3) { animation-delay: 0.06s; }
+.folder-tile:nth-child(n + 4) { animation-delay: 0.09s; }
+.banner, .toolbar.filters, .notice.flat, .pick-list, .share-card, .dns, .tabs + * { animation: fade-up 0.2s ease-out both; }
+.toast { animation: pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.side-backdrop { animation: fade-in 0.2s ease-out; }
+table.cards tbody tr { animation: fade-in 0.18s ease-out both; }
+details > summary + * { animation: slide-down 0.16s ease-out; }
+.button, .icon-button, .chip, .nav-item, .folder-open { transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s; }
+:is(.button, .icon-button, .chip):active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; transition-delay: 0s !important; }
 }
 
