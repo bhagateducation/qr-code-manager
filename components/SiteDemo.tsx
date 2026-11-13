@@ -220,11 +220,11 @@ export function TypeGrid() {
               <div className="stack">
                 <p>{open.text}</p>
                 <p className="muted">This tool makes many codes at once, so it needs a free account.</p>
-                <div className="row-actions" style={{ justifyContent: "space-between" }}>
+                <div className="row-actions">
                   <Link href="/register" className="button primary">
                     Create free account <ArrowRight size={14} />
                   </Link>
-                  <a href="#pricing" className="button" onClick={() => dialog.current?.close()}>
+                  <a href="#pricing" className="button plans-link" onClick={() => dialog.current?.close()}>
                     See plans
                   </a>
                 </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Download, PencilLine, QrCode, ScanLine, Search, ShieldCheck, Smartphone, Trash2, Users } from "lucide-react";
+import { ArrowRight, Check, Download, PencilLine, QrCode, ScanLine, Search, ShieldCheck, Smartphone, Trash2, Users, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { getPublicPlans, getSite } from "@/lib/site";
 import { getSiteOrigin } from "@/lib/site-origin";
@@ -32,6 +32,28 @@ export const metadata: Metadata = {
 };
 
 const limitLine = (value: number | null, word: string) => `${value === null ? "Unlimited" : value.toLocaleString()} ${value === 1 ? word.replace(/s$/, "") : word}`;
+
+type PublicPlan = Awaited<ReturnType<typeof getPublicPlans>>[number];
+const amount = (value: number | null) => (value === null ? "Unlimited" : value.toLocaleString("en-IN"));
+// Rows of the plan comparison. Limits and switches come from the plan itself; `true` rows are part of every plan.
+const COMPARE: { name: string; text: string; value: (plan: PublicPlan) => string | boolean }[] = [
+  { name: "QR codes", text: "How many working codes the account can hold at one time. Codes in the trash do not count.", value: (plan) => amount(plan.codes) },
+  { name: "Edit the link after printing", text: "Dynamic codes: change where a printed code leads, pause it or give it an end date.", value: () => true },
+  { name: "All single QR types", text: "Link, text, Wi-Fi, contact card, image, PDF, video, WhatsApp, location, social, menu and review codes.", value: () => true },
+  { name: "PNG and SVG download", text: "Scan-tested images for screens and vector files for printing, with your name and number as a label.", value: () => true },
+  { name: "Scan analytics", text: "Scans per day, busiest hours, phone types and top codes, with CSV export.", value: () => true },
+  { name: "iPhone and Android links", text: "One code that sends each kind of phone to its own link, such as each app store.", value: () => true },
+  { name: "Folders, tags, trash and audit log", text: "Sort codes, restore deleted ones for 30 days and see who changed what.", value: () => true },
+  { name: "Two-step sign-in", text: "Protect the account with a code from an authenticator app.", value: () => true },
+  { name: "Books and Questions QR", text: "Make a folder per chapter and a code for every question of a book in one step.", value: (plan) => plan.allowBooks },
+  { name: "Team members", text: "People who can sign in to the account as admin, editor or viewer.", value: (plan) => amount(plan.members) },
+  { name: "Extra panels", text: "Separate workspaces inside one account, for branches, departments or clients.", value: (plan) => (plan.panels === 0 ? false : amount(plan.panels)) },
+  { name: "Systems (your own tables)", text: "Tables for products, assets or members, with the fields you choose.", value: (plan) => amount(plan.systems) },
+  { name: "Records with public pages", text: "Rows in your tables. A published record gets a page that a code can open.", value: (plan) => amount(plan.records) },
+  { name: "Storage", text: "Space for your codes, records and scan history.", value: (plan) => (plan.storageMb === null ? "Unlimited" : plan.storageMb >= 1024 ? `${+(plan.storageMb / 1024).toFixed(1)} GB` : `${plan.storageMb} MB`) },
+  { name: "API keys and webhooks", text: "Create codes from your own software and get a signed event on every scan.", value: (plan) => plan.allowApi },
+  { name: "Your own domain", text: "Short links on your domain instead of ours, so printed codes carry your name.", value: (plan) => plan.allowDomain },
+];
 
 export default async function Home() {
   const [site, plans] = await Promise.all([getSite(), getPublicPlans()]);
@@ -295,6 +317,45 @@ export default async function Home() {
                 </div>
               );
             })}
+          </div>
+          <div className="compare-wrap">
+            <h3 className="display">Compare every plan in detail</h3>
+            <div className="table-scroll">
+              <table className="compare">
+                <thead>
+                  <tr>
+                    <th scope="col">Feature</th>
+                    {plans.map((plan) => (
+                      <th scope="col" key={plan.id}>{plan.name}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPARE.map((row) => (
+                    <tr key={row.name}>
+                      <th scope="row">
+                        {row.name}
+                        <small>{row.text}</small>
+                      </th>
+                      {plans.map((plan) => {
+                        const value = row.value(plan);
+                        return (
+                          <td key={plan.id}>
+                            {value === true ? (
+                              <span className="yes"><Check size={16} /><span className="sr-only">Included</span></span>
+                            ) : value === false ? (
+                              <span className="no"><X size={16} /><span className="sr-only">Not included</span></span>
+                            ) : (
+                              value
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
         )}

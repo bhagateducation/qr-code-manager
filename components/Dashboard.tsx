@@ -607,7 +607,7 @@ export default function Dashboard() {
                 <strong>{data.user.name}</strong>
                 <small>{data.user.email}</small>
                 <span className="badge">
-                  {role} · {data.workspace.plan} plan
+                  {data.user.platformAdmin ? "Platform owner" : role === "owner" ? "Account holder" : role} · {data.workspace.planName} plan
                 </span>
               </div>
               <div className="stack">
