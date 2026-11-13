@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['localhost', 'rosybrown-narwhal-127133.hostingersite.com'],
+    domains: ['localhost', 'rosybrown-narwhal-127133.hostingersite.com', 'qr.armystudy.in'],
   },
 };
 
