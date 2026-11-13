@@ -6,6 +6,18 @@ const TARGETS = ".section-intro, .tile, .step, .plan, .safe-point, .faq details,
 
 /** Fades sections in as they scroll into view. One observer, CSS does the animation. */
 export default function ScrollReveal() {
+  // Close the phone menu after a link is tapped or when tapping outside it.
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const menu = document.querySelector<HTMLDetailsElement>(".site-menu[open]");
+      if (!menu) return;
+      const target = event.target as Element;
+      if (!menu.contains(target) || target.closest("nav a")) menu.open = false;
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   useEffect(() => {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
     const items = Array.from(document.querySelectorAll<HTMLElement>(TARGETS)).filter((el) => el.getBoundingClientRect().top > innerHeight);

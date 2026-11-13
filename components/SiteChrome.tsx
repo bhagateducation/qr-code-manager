@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { QrCode } from "lucide-react";
+import { Menu, QrCode, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import type { Site } from "@/lib/site";
 import { CONTACT_EMAIL } from "@/lib/public-discovery";
@@ -25,11 +25,27 @@ export function SiteHeader({ show, home = false }: { show: Site["show"]; home?: 
             {show.steps && <a href={`${base}#how-it-works`}>How it works</a>}
             {show.pricing && <a href={`${base}#pricing`}>Pricing</a>}
             {show.faq && <a href={`${base}#faq`}>FAQ</a>}
-            <Link href="/login" className="site-mobile-signin">Sign in</Link>
           </nav>
           <div className="row-actions" style={{ flexWrap: "nowrap" }}>
             <Link href="/login" className="button">Sign in</Link>
             <Link href="/register" className="button primary">Start free</Link>
+            {/* Phone menu: a native <details>, so it opens even before JavaScript loads. */}
+            <details className="site-menu">
+              <summary aria-label="Menu">
+                <Menu size={18} className="menu-open" />
+                <X size={18} className="menu-close" />
+              </summary>
+              <nav aria-label="Mobile">
+                {show.features && <a href={`${base}#features`}>Features</a>}
+                {show.steps && <a href={`${base}#how-it-works`}>How it works</a>}
+                {show.pricing && <a href={`${base}#pricing`}>Pricing</a>}
+                {show.faq && <a href={`${base}#faq`}>FAQ</a>}
+                <Link href="/about">About</Link>
+                <Link href="/contact">Contact</Link>
+                <Link href="/login">Sign in</Link>
+                <Link href="/register" className="button primary">Start free</Link>
+              </nav>
+            </details>
           </div>
         </div>
       </header>

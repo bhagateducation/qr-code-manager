@@ -870,3 +870,44 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 .site .page-note { margin-top: 28px; text-align: center; font-size: 13px; color: var(--ink-3); }
 .site .page-note a { color: #8db8ff; }
 @media (max-width: 640px) { .site .page-hero { padding: 36px 0 28px; } }
+
+/* ───── Launch pages: phone and tablet layout ───── */
+.site main { overflow-x: clip; }
+.site .tile > *, .site .tile-art, .site .swap, .site .swap-line, .site .mock-row { min-width: 0; max-width: 100%; }
+.site .site-menu { display: none; position: static; background: none; border: 0; }
+.site .site-menu summary { list-style: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 999px; border: 1px solid var(--line-strong); background: rgb(255 255 255 / 0.06); color: #fff; cursor: pointer; }
+.site .site-menu summary::-webkit-details-marker { display: none; }
+.site .site-menu .menu-close, .site .site-menu[open] .menu-open { display: none; }
+.site .site-menu[open] .menu-close { display: block; }
+.site .site-menu > nav { position: fixed; left: 12px; right: 12px; top: 66px; z-index: 40; display: grid; gap: 2px; padding: 8px; border-radius: 18px; background: #0a1230; border: 1px solid var(--line-strong); box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.75); animation: site-rise 0.3s var(--ease) both; }
+.site .site-menu > nav a { display: flex; align-items: center; min-height: 46px; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 550; color: var(--ink); }
+.site .site-menu > nav a:hover { background: rgb(255 255 255 / 0.06); text-decoration: none; }
+.site .site-menu > nav .button.primary { margin-top: 6px; justify-content: center; color: #fff; }
+
+@media (max-width: 960px) {
+  .site .site-nav > div:not(.scroll-bar) { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 0; }
+  .site .site-nav nav[aria-label="Main"] { display: none; }
+  .site .site-menu { display: block; }
+  .site .site-nav .row-actions { gap: 8px; }
+  /* Centre the headline block and section text on phones and tablets. */
+  .site .hero { text-align: center; }
+  .site .hero-copy { justify-items: center; }
+  .site .hero-copy > p { margin-inline: auto; }
+  .site .hero-copy .row-actions, .site .hero-notes { justify-content: center; }
+  .site .tile > h3, .site .tile > p { text-align: center; margin-inline: auto; }
+  .site .step { justify-items: center; text-align: center; }
+  .site .safe-point { flex-direction: column; align-items: center; text-align: center; }
+  .site .plan > .row-actions { justify-content: center !important; gap: 8px; }
+  .site .plan h3, .site .plan .price, .site .plan > p { text-align: center; }
+}
+@media (max-width: 640px) {
+  .site .site-nav .button:not(.primary) { display: none; }
+  .site .site-nav .row-actions > .button.primary { min-height: 36px; padding: 6px 14px; }
+  .site .hero-copy .row-actions { width: 100%; }
+  .site .tile { padding: 18px; }
+  .site .swap-line { flex-wrap: wrap; row-gap: 4px; }
+  .site .route { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
+  .site .demo { padding: 12px; }
+  .site .info-grid { grid-template-columns: minmax(0, 1fr); }
+  .site .info-card { justify-items: center; text-align: center; }
+}
