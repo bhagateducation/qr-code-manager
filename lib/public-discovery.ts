@@ -4,7 +4,6 @@ export const DESCRIPTION = "Create dynamic QR codes, change their destinations a
 export const COMPANY = "Bhagat Education";
 export const COMPANY_URL = "https://bhagateducation.in/";
 export const CONTACT_URL = new URL("contact", COMPANY_URL).href;
-export const TERMS_URL = new URL("terms", COMPANY_URL).href;
 export const CONTACT_EMAIL = SUPPORT_EMAIL || "armystudyweb@gmail.com";
 export const PROFILES = ["https://github.com/bhagateducation"];
 
@@ -27,7 +26,6 @@ ${BRAND} is a web app from ${COMPANY}. Teams can manage dynamic QR codes, update
 - [Product homepage](/)
 - [About](/about)
 - [Contact and support](/contact)
-- [Bhagat Education terms](${TERMS_URL})
 - [Create an account](/register)
 `;
 }

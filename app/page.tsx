@@ -7,7 +7,7 @@ import { getSiteOrigin } from "@/lib/site-origin";
 import { checkoutConfigured } from "@/lib/payments";
 import { LiveDemo, SwapDemo } from "@/components/SiteDemo";
 import AgentTool from "@/components/AgentTool";
-import { COMPANY, CONTACT_EMAIL, COMPANY_URL, TERMS_URL, PROFILES, DESCRIPTION } from "@/lib/public-discovery";
+import { COMPANY, CONTACT_EMAIL, COMPANY_URL, PROFILES, DESCRIPTION } from "@/lib/public-discovery";
 
 const tone = (value: string) => ({ "--tone": value }) as React.CSSProperties;
 const week = [38, 52, 44, 71, 63, 88, 100];
@@ -345,7 +345,6 @@ export default async function Home() {
             <Link href="/about">About</Link>
             <Link href="/contact">Contact</Link>
             <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
-            <a href={TERMS_URL}>Bhagat Education terms</a>
             <Link href="/login">Sign in</Link>
             <Link href="/register">Create account</Link>
           </span>
