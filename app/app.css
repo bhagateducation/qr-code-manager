@@ -725,7 +725,7 @@ input:not([type="checkbox"], [type="color"], [type="radio"]), select, textarea {
 .bell-dot { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
 .popover.notices { width: min(360px, 92vw); max-height: 70vh; overflow-y: auto; padding: 8px; display: grid; gap: 2px; }
 .notices-head { padding: 4px 6px 8px; font-size: 14px; }
-.notice-item { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; border-left: 3px solid var(--line-strong); }
+.notice-item { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; border-left: 1px solid var(--line-strong); }
 .notice-item:hover { background: var(--sunk); }
 .notice-item.feature { border-left-color: var(--brand); }
 .notice-item.alert { border-left-color: var(--danger); }
@@ -1058,7 +1058,7 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
    (icons stay put, labels fade in). Hover opens over the page; the fold button resizes the page. */
 @media (min-width: 961px) {
   /* The menu fills its grid column, and only the column animates, so the menu and the page move as one. */
-  .app.mini .side { width: 100%; overflow: hidden; }
+  .app.mini .side { width: 100%; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
   .app.mini:has(> .side:hover, > .side :focus-visible) { grid-template-columns: var(--side-w) minmax(0, 1fr); transition-delay: 0.1s; }
   .app.mini .side :is(.nav-item, .side-search, .side-head, .side-user, .nav-group) { white-space: nowrap; }
   .app.mini .side :is(.side-head .grow, .side-search span, .side-search kbd, .nav-item .grow, .nav-count, .side-user .grow, .side-user > svg, .side-toggle, .nav-group) { transition: opacity 0.14s; }
