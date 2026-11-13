@@ -934,3 +934,8 @@ button.nav-group[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .nav-item.nav-sub { width: calc(100% - 10px); margin-left: 10px; }
 /* Launch header: without Start free the full product name fits on phones. */
 .site .site-nav .brand { white-space: nowrap; }
+
+/* "What kind of QR code?" chooser */
+.choose-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.choose-item { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r); font-size: 13px; font-weight: 600; text-align: left; transition: border-color 0.15s, background 0.15s, transform 0.15s; }
+.choose-item:hover { border-color: var(--brand); background: var(--brand-wash); transform: translateY(-1px); }

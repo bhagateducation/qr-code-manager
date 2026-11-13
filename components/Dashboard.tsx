@@ -87,6 +87,7 @@ export default function Dashboard() {
     [drawer, setDrawer] = useState(false),
     [editing, setEditing] = useState<QR | null | undefined>(undefined),
     [tool, setTool] = useState<QrTool | undefined>(undefined),
+    [chooser, setChooser] = useState(false),
     [openGroups, setOpenGroups] = useState<Record<string, boolean>>({}),
     [page, setPage] = useState(1),
     [filters, setFilters] = useState<Filters>(noFilters),
@@ -153,6 +154,8 @@ export default function Dashboard() {
 
   const openStudio = useCallback(
     (qr: QR | null) => {
+      // A new code first asks which kind to make; the chooser then opens the studio.
+      if (!qr) return setChooser(true);
       go("codes");
       setTool(undefined);
       setEditing(qr);
@@ -582,6 +585,20 @@ export default function Dashboard() {
                 </div>
               </motion.div>
             </motion.div>
+          )}
+          {chooser && (
+            <Modal title="What kind of QR code do you want?" wide onClose={() => setChooser(false)}>
+              <div className="choose-grid">
+                {QR_TYPES.map((item) => (
+                  <button key={item.id} className="choose-item" onClick={() => (setChooser(false), openTool(item))}>
+                    <span className="nav-ico" style={toneStyle(item.tone)}>
+                      <item.icon size={16} />
+                    </span>
+                    {item.name.replace(/ QR Codes?$| to QR Code$/, "")}
+                  </button>
+                ))}
+              </div>
+            </Modal>
           )}
           {profile && (
             <Modal title="Your account" onClose={() => setProfile(false)}>
